@@ -98,10 +98,8 @@ class Players:
     def check_agents_pass_court(self):
         pass
 
-    def check_agents_conflict(self, agent_pos, _map):
-        if _map[agent_pos[0]][agent_pos[1]] != 0:
-            return True
-        return False
+    def check_agents_conflict(self):
+        pass
     
     def simulate_move(self, action, _map, ball):
         if action == 0: # stand still
@@ -125,7 +123,7 @@ class Players:
             virtual_agent_pos = self.pos
         return virtual_agent_pos, virtual_ball_pos
 
-    def _step(self, action, _map, ball):
+    def after_step(self, action, _map, ball):
         done = False
         penalty = 0.0
         done_reward = 0.0
@@ -138,11 +136,12 @@ class Players:
         action_records = {}
         for k, v, in itertools.groupby(self.actions):
             action_records[k] = list(v)
-        if len(action_records[0]) == 5: # if not move more than 3 steps give a minus reward
+        if len(action_records[0]) == 5: # if not move more than 3 steps give a penalty
             penalty = -1
             self.actions.clear()
         if len(self.actions) > 1000:
             self.actions.clear() # avoid memory leak
+
         if self.check_agents_pass_court(virtual_agent_pos):
             agent_pass_court = True
             done_reward = -1
@@ -171,7 +170,7 @@ class Players:
                     move_reward = 1.0
                 if self.court_id == "right" and action == 4:
                     move_reward = -1.0
-            else:
+            if self.team == "defend":
                 if self.pos[0] - ball.pos[0] < 0 and action == 2:
                     move_reward = 1.0
                 if  self.pos[0] - ball.pos[0] < 0 and action == 1:
@@ -184,4 +183,44 @@ class Players:
                     move_reward = -1.0
 
         reward = done_reward + move_reward + penalty        
+        return reward, done
+
+    def after_step(self, action, ball):
+        penalty = 0.0
+        move_reward = 0.0
+
+        '''done reward
+        '''
+        self.actions.append(action)
+        action_records = {}
+        for k, v, in itertools.groupby(self.actions):
+            action_records[k] = list(v)
+        if len(action_records[0]) == 5: # if not move more than 3 steps give a penalty
+            penalty = -1
+            self.actions.clear()
+        if len(self.actions) > 1000:
+            self.actions.clear() # avoid memory leak
+
+        if self.team == "attack":
+            if self.court_id == "left" and action == 4:
+                move_reward = 1.0
+            if self.court_id == "left" and action == 3:
+                move_reward = -1.0
+            if self.court_id == "right" and action == 3:
+                move_reward = 1.0
+            if self.court_id == "right" and action == 4:
+                move_reward = -1.0
+        if self.team == "defend":
+            if self.pos[0] - ball.pos[0] < 0 and action == 2:
+                move_reward = 1.0
+            if  self.pos[0] - ball.pos[0] < 0 and action == 1:
+                move_reward = -1.0
+            if self.pos[0] - ball.pos[0] > 0 and action == 1:
+                move_reward = 1.0
+            if self.pos[0] - ball.pos[0] > 0 and action == 2:
+                move_reward = -1.0
+            if self.pos[0] - ball.pos[0] == 0 and (action == 1 or action ==2):
+                move_reward = -1.0
+
+        reward = move_reward + penalty        
         return reward, done

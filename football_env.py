@@ -3,6 +3,7 @@ import random
 from players import Players
 from ball import Ball
 import math
+from collections import namedtuple
 
 
 '''
@@ -19,17 +20,25 @@ x
 x = pos[0], y = pos[1]
 '''
 
+Observation = namedtuple('Observation', ['team', 'agent_id', 'obs'])
+Actions = namedtuple('Actions', ['team', 'agent_id', 'actions'])
+Rewards = namedtuple('Rewards', ['team', 'agent_id', 'rewards'])
+
 
 class Football_Env:
-    def __init__(self, agents_left: list, agents_right: list, max_episode_steps, court_width, court_height):
+    def __init__(self, 
+    agents_left: list, agents_right: list, 
+    max_episode_steps, move_reward_weight=1.0,
+    court_width=24, court_height=18):
         self.agents_left = agents_left # list of agent_id in the left court
         self.agents_right = agents_right # list of agent_id in the right court
         self.max_episode_steps = max_episode_steps
         self.court_width = court_width
         self.court_height = court_height
+        self.move_reward_weight = move_reward_weight
         self.elapsed_steps = 0
-        self.GOAL_REWARD = 10
-        self.agents_contact = False
+        self.GOAL_REWARD = 10.0
+        self.agents_conflict = False
         self.previous_map = None
         self._map = None
         self.n_agents = len(agents_left) + len(agents_right)
@@ -111,66 +120,89 @@ class Football_Env:
                 break
 
     def update_map(self):
+        self.agents_conflict = False
         self.previous_map = self._map
         self._map = np.zeros([self.court_height, self.court_width])
         for agent in self.agents.values():
-            self._map[agent.pos[0]][agent.pos[1]] = agent.id
+            if self._map[agent.pos[0]][agent.pos[1]] == 0:
+                self._map[agent.pos[0]][agent.pos[1]] = agent.id
+            else:
+                print("agents contact!")
+                self.agents_conflict = True
 
     def get_obs(self):
         obs = []
         for i in range(self.n_agents):
-            obs.append(self.agents[i]._get_obs(self._map))
+            _obs = Observation(self.agents[i].team, self.agents[i].id, self.agents[i]._get_obs(self._map))
+            obs.append(_obs)
         return tuple(obs)
 
     def sample_actions(self):
         actions = []
         for i in range(self.n_agents):
-            actions.append(self.agents[i].sample_action())
+            _actions = Actions(self.agents[i].team, self.agents[i].id, self.agents[i]._sample_action())
+            actions.append(_actions)
         return tuple(actions)
 
     def agents_past_court(self, id):
-        x = self.agents[id].pos[1]
-        y = self.agents[id].pos[0]
+        x = self.agents[id].pos[0]
+        y = self.agents[id].pos[1]
         if x < 0 or x >= self.court_width or y < 0 or y >= self.court_height:
             return True
         return False
 
-    def agents_conflict(self):
-        for i in range(self._map.shape[0]):
-            for j in range(self._map.shape[1]):
-                if self.previous_map[i][j] != 0 and self._map[i][j] != 0 and self.previous_map[i][j] != self._map[i][j]:
-                    return True
-        return False
-
-
-    def goal_reward(self):
+    def step(self, actions: list):
         self.elapsed_steps += 1
-        agents_past_court = [self.agents_past_court(i) for i in range(self.n_agents)]
-        agents_conflict = self.agents_conflict()
-        ball_past_court = self.ball.check_ball_pass_court()
-        score = self.ball.check_ball_score()
-
-
-    def step(self, actions):
+        done_rewards, move_rewards, goal_rewards = [], [], []
+        dones = []
         for i in range(self.n_agents):
-            move_reward, agent_done = self.agents[i].after_step(actions[i])
+            agent_done, done_reward = self.get_done_rewards(self.agents[i], actions[i])
+            dones += agent_done
+            done_rewards.append(done_reward)
+            move_reward = self.get_move_rewards(self.agents[i], actions[i])
+            move_rewards.append(move_reward)
+            goal_reward = self.get_goal_rewards(actions[i])
+            goal_rewards.append(goal_reward)
 
-    def agent_pass_court(self, agent_pos):
-        pass
+        rewards = []
+        for i in range(self.n_agents):
+            rew = float(goal_rewards[i] + done_rewards[i] + self.move_reward_weight * move_rewards[i])
+            reward = Rewards(team=self.agents[i].team, agent_id=i, rewards=rew)
+            rewards.append(reward)
+        rewards = tuple(rewards)
+        done = True in dones
+        obs = self.get_obs()
 
-    def _set_action_space(self):
-        pass
+        return obs, rewards, done
 
-    def _get_goal_rewards(self):
-        pass
+    def get_goal_rewards(self, action):
+        if action == 6:
+            is_score = self.ball.check_ball_score()
+            if is_score:
+                return self.GOAL_REWARD
+            else:
+                return 0.0
+        else:
+            return 0.0
 
-    def _get_done(self):
-        pass
+    def get_done_rewards(self, agent, action):
+        dones = []
+        done_reward = 0.0
+        agent.pos, self.ball.pos = agent.simulate_move(action, self._map, self.ball)
+        self.update_map()
+        dones.append(self.agents_conflict)
+        if self.agents_past_court(agent.id):
+            dones.append(True)
+            done_reward -= 1.0
+        if self.ball.check_ball_pass_court():
+            dones.append(True)
+            done_reward -= 1.0
+        if self.ball.check_ball_score(agent.team, agent.court_id, self.court_width, self.court_height):
+            dones.append(True)
+            done_reward += 1.0
 
+        return dones, done_reward
 
-
-    def _get_obs(self):
-        pass
-
-    '''some rules
-    '''
+    def get_move_rewards(self, agent, action):
+        move_reward = agent.after_step(action)
+        return move_reward
