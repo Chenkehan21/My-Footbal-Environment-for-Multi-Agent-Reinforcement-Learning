@@ -4,6 +4,7 @@ from players import Players
 from ball import Ball
 import math
 
+
 '''
 map:
 (0,0)------------------> y
@@ -17,6 +18,7 @@ x
 
 x = pos[0], y = pos[1]
 '''
+
 
 class Football_Env:
     def __init__(self, agents_left: list, agents_right: list, max_episode_steps, court_width, court_height):
@@ -36,10 +38,48 @@ class Football_Env:
 
     def reset(self):
         # initialize map
+        self.reset_map()
+
+        # initializer team
+        self.reset_agents_team()
+        
+        # intialize players postion
+        for agent in self.agents.values():
+            self.reset_agent_position(agent)
+
+        # give ball to the attack team
+        self.reset_ball_possesion()
+        
+        # update map
+        self.update_map()
+
+    def reset_map(self):
         self.previous_map = np.zeros([self.court_height, self.court_width])
         self._map = np.zeros([self.court_height, self.court_width])
 
-        # initializer team
+    def reset_agent_position(self, agent):
+        left_court_start = 0
+        steps = math.floor(self.court_width / 2)
+        left_court_end = left_court_start + steps
+        right_court_start = self.court_width - steps
+        right_court_end = self.court_width
+
+        if self.court_id == "left":
+            x = random.choice(list(range(left_court_start, left_court_end))) # top left conner is (0, 0)
+            y = random.choice(list(range(0, self.court_height)))
+            if self._map[x][y] != 0:
+                self.reset_agents_position(agent)
+            else:
+                agent.pos = [x, y]
+        if self.court_id == "right":
+            x = random.choice(list(range(right_court_start, right_court_end))) # top left conner is (0, 0)
+            y = random.choice(list(range(0, self.court_height)))
+            if self._map[x][y] != 0:
+                self.reset_agents_position(agent)
+            else:
+                agent.pos = [x, y]
+
+    def reset_agents_team(self):
         team_choices = ["attack", "defend"]
         left_court_team = random.choice(team_choices)
         team_choices.remove(left_court_team)
@@ -49,7 +89,6 @@ class Football_Env:
         else:
             self.attack_court = "right"
         
-        # intialize players
         id = 1
         for _court_id in self.agents_left:
             self.agents[id] = Players(id, court_id=_court_id, team=left_court_team, _map=self._map)
@@ -58,52 +97,17 @@ class Football_Env:
         for _court_id in self.agents_right:
             self.agents[id] = Players(id, court_id=_court_id, team=right_court_team, _map=self._map)
 
-        # give ball to the attack team
-        for agent in self.agents.items():
-            if agent.team == "attack":
-                self.ball.give_ball_possession(agent.pos)
-                agent.posses_ball = True
-        
-        # update map
-        self.update_map()
-
-    def reset_agents_position(self, agent):
-        left_court_start = 0
-        left_court_end = math.floor(self.court_width / 2) + 1
-        right_court_start = math.ceil(self.court_width / 2)
-        right_court_end = self.court_width
-
-        if self.court_id == "left":
-            x = random.choice(list(range(left_court_start, left_court_end))) # top left conner is (0, 0)
-            y = random.choice(list(range(0, self.court_height)))
-            if self._map[x][y] != 0:
-                self.reset_agents_position()
-        if self.court_id == "right":
-            x = random.choice(list(range(right_court_start, right_court_end))) # top left conner is (0, 0)
-            y = random.choice(list(range(0, self.court_height)))
-            if self._map[x][y] != 0:
-                self.reset_agents_position()
-        agent.pos = [x, y]
-
-    def reset_agents(self):
-        team_choices = ["attack", "defend"]
-        left_court_team = random.choice(team_choices)
-        team_choices.remove(left_court_team)
-        right_court_team = team_choices[0]
-        if left_court_team == "attack":
-            attack_court = "left"
-        else:
-            attack_court = "right"
         for agent in self.agents.values():
             if agent.court_id == "left":
                 agent.team = left_court_team
             if agent.court_id == "right":
                 agent.team = right_court_team
-            self.reset_agents_position(agent)
-            self.update_map()
+    
+    def reset_ball_possesion(self):
         for agent in self.agents.values():
-            if agent.court_id == attack_court:
+            if agent.court_id == self.attack_court:
                 self.ball.give_ball_possession(agent.pos)
+                agent.posses_ball = True
                 break
 
     def update_map(self):
