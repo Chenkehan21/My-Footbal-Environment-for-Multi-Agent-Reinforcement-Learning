@@ -5,20 +5,23 @@ from ball import Ball
 import math
 
 '''
-(0,0)------------------> x
+map:
+(0,0)------------------> y
 |
 |
 |     . pos(x, y)
 |
 |
 |
-y
+x
+
+x = pos[0], y = pos[1]
 '''
 
 class Football_Env:
-    def __init__(self, agents_left, agents_right, max_episode_steps, court_width, court_height):
-        self.agents_left = agents_left
-        self.agents_right = agents_right
+    def __init__(self, agents_left: list, agents_right: list, max_episode_steps, court_width, court_height):
+        self.agents_left = agents_left # list of agent_id in the left court
+        self.agents_right = agents_right # list of agent_id in the right court
         self.max_episode_steps = max_episode_steps
         self.court_width = court_width
         self.court_height = court_height
@@ -32,8 +35,11 @@ class Football_Env:
         self.ball = Ball()
 
     def reset(self):
+        # initialize map
         self.previous_map = np.zeros([self.court_height, self.court_width])
         self._map = np.zeros([self.court_height, self.court_width])
+
+        # initializer team
         team_choices = ["attack", "defend"]
         left_court_team = random.choice(team_choices)
         team_choices.remove(left_court_team)
@@ -43,18 +49,22 @@ class Football_Env:
         else:
             self.attack_court = "right"
         
+        # intialize players
         id = 1
-        for court in self.agents_left:
-            self.agents[id] = Players(id, court_id=court, team=left_court_team, _map=self._map)
+        for _court_id in self.agents_left:
+            self.agents[id] = Players(id, court_id=_court_id, team=left_court_team, _map=self._map)
             id += 1
         id += 1
-        for court in self.agents_right:
-            self.agents[id] = Players(id, court_id=court, team=right_court_team, _map=self._map)
+        for _court_id in self.agents_right:
+            self.agents[id] = Players(id, court_id=_court_id, team=right_court_team, _map=self._map)
 
-        for agent in self.agents.values:
+        # give ball to the attack team
+        for agent in self.agents.items():
             if agent.team == "attack":
                 self.ball.give_ball_possession(agent.pos)
                 agent.posses_ball = True
+        
+        # update map
         self.update_map()
 
     def reset_agents_position(self, agent):
@@ -95,11 +105,6 @@ class Football_Env:
             if agent.court_id == attack_court:
                 self.ball.give_ball_possession(agent.pos)
                 break
-        
-    def reset(self):
-        self.previous_map = np.zeros([self.court_height, self.court_width])
-        self._map = np.zeros([self.court_height, self.court_width])
-
 
     def update_map(self):
         self.previous_map = self._map

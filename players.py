@@ -6,7 +6,7 @@ import math
 class Players:
     '''
     attackers' action space:
-    0: None
+    0: Stand still
     1: Up
     2: Down
     3: Left
@@ -15,20 +15,21 @@ class Players:
     6: Shoot
 
     defenders' action space:
-    0: None
+    0: Stand still
     1: Up
     2: Down
     3: Left
     4: Right
     '''
-    def __init__(self, agent_id, court_id, team, court_width, court_height):
+    def __init__(self, agent_id, court_id, team, court_width, court_height, _map):
         self.id = agent_id # start from 1
         self.court_id = court_id # court_id is left or right
-        self.team = team # team can be attack or defender
+        self.team = team # team can be attacker or defender
         self.court_width = court_width
         self.court_height = court_height
         self.pos = None
-        self.reset_position(_map)
+        self._map = _map
+        self.reset_position(self._map)
         self.actions = []
         self.gate_pos = self.get_gate_pos()
         self.posses_ball = None
@@ -62,13 +63,13 @@ class Players:
         if self.court_id == "left":
             x = random.choice(list(range(left_court_start, left_court_end))) # top left conner is (0, 0)
             y = random.choice(list(range(0, self.court_height)))
-            if _map[x][y] != 0:
-                self.reset_position(_map)
+            if self._map[x][y] != 0:
+                self.reset_position(self._map)
         if self.court_id == "right":
             x = random.choice(list(range(right_court_start, right_court_end))) # top left conner is (0, 0)
-            y = random.choice(list(range(0, court_height)))
-            if _map[x][y] != 0:
-                self.reset_position(_map)
+            y = random.choice(list(range(0, self.court_height)))
+            if self._map[x][y] != 0:
+                self.reset_position(self._map)
         self.pos = [x, y]
 
     def before_step(self):
@@ -103,23 +104,23 @@ class Players:
         return False
     
     def simulate_move(self, action, _map, ball):
-        if action == 0:
+        if action == 0: # stand still
             virtual_agent_pos = self.pos
-        if action == 1:
-            virtual_agent_pos = [self.pos[0], self.pos[1] - 1]
-        if action == 2:
-            virtual_agent_pos = [self.pos[0], self.pos[1] + 1]
-        if action == 3:
+        if action == 1: # UP
             virtual_agent_pos = [self.pos[0] - 1, self.pos[1]]
-        if action == 4:
+        if action == 2: # Down
             virtual_agent_pos = [self.pos[0] + 1, self.pos[1]]
+        if action == 3: # Left
+            virtual_agent_pos = [self.pos[0], self.pos[1] - 1]
+        if action == 4: # Right
+            virtual_agent_pos = [self.pos[0], self.pos[1] + 1]
         if self.team == "attack":
             agents_around = self.see_around(_map)
             if agents_around:
                 pass_agent_pos = random.choice(agents_around)
-                if action == 5 and self.posses_ball:
+                if action == 5 and self.posses_ball: # Pass
                     virtual_ball_pos = ball.move(self.pos, pass_agent_pos, _map) # if the ball runs into boundary or defenders it will be stoped and one episode done
-            if action == 6 and self.can_shoot():
+            if action == 6 and self.can_shoot(): # Shoot
                 virtual_ball_pos = ball.move(self.pos, self.gate_pos, _map)
             virtual_agent_pos = self.pos
         return virtual_agent_pos, virtual_ball_pos
@@ -171,15 +172,15 @@ class Players:
                 if self.court_id == "right" and action == 4:
                     move_reward = -1.0
             else:
-                if self.pos[1] - ball.pos[1] < 0 and action == 2:
+                if self.pos[0] - ball.pos[0] < 0 and action == 2:
                     move_reward = 1.0
-                if  self.pos[1] - ball.pos[1] < 0 and action == 1:
+                if  self.pos[0] - ball.pos[0] < 0 and action == 1:
                     move_reward = -1.0
-                if self.pos[1] - ball.pos[1] > 0 and action == 1:
+                if self.pos[0] - ball.pos[0] > 0 and action == 1:
                     move_reward = 1.0
-                if self.pos[1] - ball.pos[1] > 0 and action == 2:
+                if self.pos[0] - ball.pos[0] > 0 and action == 2:
                     move_reward = -1.0
-                if self.pos[1] - ball.pos[1] == 0 and (action == 1 or action ==2):
+                if self.pos[0] - ball.pos[0] == 0 and (action == 1 or action ==2):
                     move_reward = -1.0
 
         reward = done_reward + move_reward + penalty        
