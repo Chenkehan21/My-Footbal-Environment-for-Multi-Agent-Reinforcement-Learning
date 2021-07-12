@@ -21,12 +21,14 @@ class Players:
     3: Left
     4: Right
     '''
-    def __init__(self, agent_id, court_id, team, court_width, court_height, _map):
+
+    def __init__(self, agent_id, court_id, team, court_width, court_height, gate_width, _map):
         self.id = agent_id # start from 1
         self.court_id = court_id # court_id is left or right
         self.team = team # team can be attacker or defender
         self.court_width = court_width
         self.court_height = court_height
+        self.gate_width = gate_width
         self.pos = None
         self._map = _map
         self.reset_position(self._map)
@@ -45,6 +47,7 @@ class Players:
             np.array(gate_pos)],
             np.array([self.posses_ball])
         )
+        
         return obs
 
     def sample_action(self):
@@ -52,6 +55,7 @@ class Players:
             action = random.choice(list(range(7)))
         if self.team == "deffend":
             action = random.choice(list(range(5)))
+        
         return action
 
     def reset_position(self):
@@ -72,9 +76,6 @@ class Players:
                 self.reset_position(self._map)
         self.pos = [x, y]
 
-    def before_step(self):
-        pass
-
     def see_around(self, _map): # map is a two dimension. "map[i][j] = x" means agent_x at position (i, j)
         agents_around = []
         court_width = _map.shape[1]
@@ -87,21 +88,35 @@ class Players:
             for j in range(col_start, col_end):
                 if _map[i][j] != 0 and _map[i][j] != self.id:
                     agents_around.append([i, j])
+        
         return agents_around
 
     def get_gate_pos(self):
-        pass
-
-    def can_shoot(self):
-        pass
-
-    def check_agents_pass_court(self):
-        pass
-
-    def check_agents_conflict(self):
-        pass
+        left_gate_pos = [
+                [i, 0] for i in 
+                range(
+                    self.court_height / 2 - self.gate_width / 2, 
+                    self.court_height / 2 + self.gate_width / 2 + 1
+                    )
+            ]
+        right_gate_pos = [
+                [i, self.court_width - 1] for i in 
+                range(
+                    self.court_height / 2 - self.gate_width / 2, 
+                    self.court_height / 2 + self.gate_width / 2 + 1
+                    )
+            ]
+        if self.court_id == "left":
+            my_gate_pos = left_gate_pos
+            attack_gate_pos = right_gate_pos
+        if self.court_id == "right":
+            my_gate_pos = right_gate_pos
+            attack_gate_pos = left_gate_pos
+        
+        return [my_gate_pos, attack_gate_pos]
     
     def simulate_move(self, action, _map, ball):
+        pass_blocked, shoot_blocked = False, False
         if action == 0: # stand still
             virtual_agent_pos = self.pos
         if action == 1: # UP
@@ -117,110 +132,65 @@ class Players:
             if agents_around:
                 pass_agent_pos = random.choice(agents_around)
                 if action == 5 and self.posses_ball: # Pass
-                    virtual_ball_pos = ball.move(self.pos, pass_agent_pos, _map) # if the ball runs into boundary or defenders it will be stoped and one episode done
+                    # if the ball runs into boundary or defenders it will be stoped and one episode done
+                    virtual_ball_pos = ball.move(self.pos, pass_agent_pos, _map)
+                    if ball.blocked:
+                        pass_blocked = True
             if action == 6 and self.can_shoot(): # Shoot
                 virtual_ball_pos = ball.move(self.pos, self.gate_pos, _map)
+                if ball.blocked:
+                    shoot_blocked = True
             virtual_agent_pos = self.pos
-        return virtual_agent_pos, virtual_ball_pos
-
-    def after_step(self, action, _map, ball):
-        done = False
-        penalty = 0.0
-        done_reward = 0.0
-        move_reward = 0.0
-        virtual_agent_pos, virtual_ball_pos = self.simulate_move(action, _map, ball)
-
-        '''done reward
-        '''
-        self.actions.append(action)
-        action_records = {}
-        for k, v, in itertools.groupby(self.actions):
-            action_records[k] = list(v)
-        if len(action_records[0]) == 5: # if not move more than 3 steps give a penalty
-            penalty = -1
-            self.actions.clear()
-        if len(self.actions) > 1000:
-            self.actions.clear() # avoid memory leak
-
-        if self.check_agents_pass_court(virtual_agent_pos):
-            agent_pass_court = True
-            done_reward = -1
-        if ball.check_ball_pass_court(virtual_ball_pos):
-            ball_passs_court = True
-            done_reward = -1
-        if ball.check_ball_score(virtual_ball_pos, self.team, self.court_id, _map):
-            score = True
-            done_reward = 1
-        if ball.check_ball_score(virtual_ball_pos, self.team, self.court_id, _map):
-            score = True
-            done_reward = -1
-
-        if agent_pass_court or ball_passs_court or score or self.check_agents_conflict():
-            done = True
-
-        if not done:
-            '''move reward
-            '''
-            if self.team == "attack":
-                if self.court_id == "left" and action == 4:
-                    move_reward = 1.0
-                if self.court_id == "left" and action == 3:
-                    move_reward = -1.0
-                if self.court_id == "right" and action == 3:
-                    move_reward = 1.0
-                if self.court_id == "right" and action == 4:
-                    move_reward = -1.0
-            if self.team == "defend":
-                if self.pos[0] - ball.pos[0] < 0 and action == 2:
-                    move_reward = 1.0
-                if  self.pos[0] - ball.pos[0] < 0 and action == 1:
-                    move_reward = -1.0
-                if self.pos[0] - ball.pos[0] > 0 and action == 1:
-                    move_reward = 1.0
-                if self.pos[0] - ball.pos[0] > 0 and action == 2:
-                    move_reward = -1.0
-                if self.pos[0] - ball.pos[0] == 0 and (action == 1 or action ==2):
-                    move_reward = -1.0
-
-        reward = done_reward + move_reward + penalty        
-        return reward, done
+        
+        return virtual_agent_pos, virtual_ball_pos, shoot_blocked, pass_blocked
 
     def after_step(self, action, ball):
-        penalty = 0.0
-        move_reward = 0.0
+        stand_still_penalty = 0.0
+        attack_reward, defend_reward, block_reward = 0.0, 0.0, 0.0
+        reward_info = dict()
 
-        '''done reward
-        '''
+        _, _, shoot_blocked, pass_blocked = self.simulate_move(action, self._map, ball)
+
+        # check action = 0, we don't want the agent always stand still
         self.actions.append(action)
         action_records = {}
         for k, v, in itertools.groupby(self.actions):
             action_records[k] = list(v)
         if len(action_records[0]) == 5: # if not move more than 3 steps give a penalty
-            penalty = -1
+            stand_still_penalty = -1.0
             self.actions.clear()
         if len(self.actions) > 1000:
             self.actions.clear() # avoid memory leak
 
         if self.team == "attack":
             if self.court_id == "left" and action == 4:
-                move_reward = 1.0
+                attack_reward = 1.0
             if self.court_id == "left" and action == 3:
-                move_reward = -1.0
+                attack_reward = -1.0
             if self.court_id == "right" and action == 3:
-                move_reward = 1.0
+                attack_reward = 1.0
             if self.court_id == "right" and action == 4:
-                move_reward = -1.0
+                attack_reward = -1.0
+
         if self.team == "defend":
             if self.pos[0] - ball.pos[0] < 0 and action == 2:
-                move_reward = 1.0
+                defend_reward = 1.0
             if  self.pos[0] - ball.pos[0] < 0 and action == 1:
-                move_reward = -1.0
+                defend_reward = -1.0
             if self.pos[0] - ball.pos[0] > 0 and action == 1:
-                move_reward = 1.0
+                defend_reward = 1.0
             if self.pos[0] - ball.pos[0] > 0 and action == 2:
-                move_reward = -1.0
+                defend_reward = -1.0
             if self.pos[0] - ball.pos[0] == 0 and (action == 1 or action ==2):
-                move_reward = -1.0
+                defend_reward = -1.0
 
-        reward = move_reward + penalty        
-        return reward, done
+            if pass_blocked or shoot_blocked:
+                block_reward = 1.0
+
+        reward = attack_reward + defend_reward + block_reward + stand_still_penalty
+        reward_info["attack"] = attack_reward
+        reward_info["defend"] = defend_reward
+        reward_info["block"] = block_reward
+        reward_info["stand_still_penalty"] = stand_still_penalty
+        
+        return reward, reward_info
