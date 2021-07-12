@@ -4,7 +4,6 @@ import numpy as np
 class Ball:
     def __init__(self):
         self.pos = None
-        self.reset()
         self.blocked = False
 
     def give_ball_possession(self, pos):

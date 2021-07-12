@@ -1,5 +1,8 @@
-from collections import namedtuple
+from football_env import Football_Env
 
-Observation = namedtuple('Observation', ['team', 'agent_id', 'obs'])
-Actions = namedtuple('Actions', ['team', 'agent_id', 'actions'])
-Rewards = namedtuple('Rewards', ['team', 'agent_id', 'rewards'])
+
+if __name__ == "__main__":
+    env = Football_Env(agents_left=[1, 2], agents_right=[3, 4],
+    max_episode_steps=500, move_reward_weight=1.0,
+    court_width=24, court_height=18, gate_width=6)
+    
