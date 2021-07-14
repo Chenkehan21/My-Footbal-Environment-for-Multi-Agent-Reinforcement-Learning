@@ -31,7 +31,6 @@ class Players:
         self.gate_width = gate_width
         self.pos = None
         self._map = _map
-        self.reset_position(self._map)
         self.actions = []
         self.gate_pos = self.get_gate_pos()
         self.posses_ball = None
@@ -58,24 +57,6 @@ class Players:
         
         return action
 
-    def reset_position(self):
-        left_court_start = 0
-        left_court_end = math.floor(self.court_width / 2) + 1
-        right_court_start = math.ceil(self.court_width / 2)
-        right_court_end = self.court_width
-
-        if self.court_id == "left":
-            x = random.choice(list(range(left_court_start, left_court_end))) # top left conner is (0, 0)
-            y = random.choice(list(range(0, self.court_height)))
-            if self._map[x][y] != 0:
-                self.reset_position(self._map)
-        if self.court_id == "right":
-            x = random.choice(list(range(right_court_start, right_court_end))) # top left conner is (0, 0)
-            y = random.choice(list(range(0, self.court_height)))
-            if self._map[x][y] != 0:
-                self.reset_position(self._map)
-        self.pos = [x, y]
-
     def see_around(self, _map): # map is a two dimension. "map[i][j] = x" means agent_x at position (i, j)
         agents_around = []
         court_width = _map.shape[1]
@@ -95,15 +76,15 @@ class Players:
         left_gate_pos = [
                 [i, 0] for i in 
                 range(
-                    self.court_height / 2 - self.gate_width / 2, 
-                    self.court_height / 2 + self.gate_width / 2 + 1
+                    int(self.court_height / 2) - int(self.gate_width / 2), 
+                    int(self.court_height / 2) + int(self.gate_width / 2) + 1
                     )
             ]
         right_gate_pos = [
                 [i, self.court_width - 1] for i in 
                 range(
-                    self.court_height / 2 - self.gate_width / 2, 
-                    self.court_height / 2 + self.gate_width / 2 + 1
+                    int(self.court_height / 2) - int(self.gate_width / 2), 
+                    int(self.court_height / 2) + int(self.gate_width / 2) + 1
                     )
             ]
         if self.court_id == "left":

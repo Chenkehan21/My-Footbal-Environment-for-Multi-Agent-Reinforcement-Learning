@@ -74,18 +74,18 @@ class Football_Env:
         right_court_start = self.court_width - steps
         right_court_end = self.court_width
 
-        if self.court_id == "left":
-            x = random.choice(list(range(left_court_start, left_court_end))) # top left conner is (0, 0)
-            y = random.choice(list(range(0, self.court_height)))
+        if agent.court_id == "left":
+            y = random.choice(list(range(left_court_start, left_court_end))) # top left conner is (0, 0)
+            x = random.choice(list(range(0, self.court_height)))
             if self._map[x][y] != 0:
-                self.reset_agents_position(agent)
+                self.reset_agent_position(agent)
             else:
                 agent.pos = [x, y]
-        if self.court_id == "right":
-            x = random.choice(list(range(right_court_start, right_court_end))) # top left conner is (0, 0)
-            y = random.choice(list(range(0, self.court_height)))
+        if agent.court_id == "right":
+            y = random.choice(list(range(right_court_start, right_court_end))) # top left conner is (0, 0)
+            x = random.choice(list(range(0, self.court_height)))
             if self._map[x][y] != 0:
-                self.reset_agents_position(agent)
+                self.reset_agent_position(agent)
             else:
                 agent.pos = [x, y]
 
@@ -99,13 +99,14 @@ class Football_Env:
         else:
             self.attack_court = "right"
         
-        id = 1
-        for _court_id in self.agents_left:
-            self.agents[id] = Players(id, court_id=_court_id, team=left_court_team, _map=self._map)
-            id += 1
-        id += 1
-        for _court_id in self.agents_right:
-            self.agents[id] = Players(id, court_id=_court_id, team=right_court_team, _map=self._map)
+        for id in self.agents_left:
+            self.agents[id] = Players(agent_id=id, court_id="left", team=left_court_team, 
+            court_width=self.court_width, court_height=self.court_height, gate_width=self.gate_width,
+            _map=self._map)
+        for id in self.agents_right:
+            self.agents[id] = Players(agent_id=id, court_id="right", team=left_court_team, 
+            court_width=self.court_width, court_height=self.court_height, gate_width=self.gate_width,
+            _map=self._map)
 
         for agent in self.agents.values():
             if agent.court_id == "left":
@@ -215,3 +216,10 @@ class Football_Env:
         move_reward, rew_info = agent.after_step(action)
         
         return move_reward, rew_info
+
+    def get_all_pos(self):
+        agents_pos = dict()
+        for i in range(1, self.n_agents + 1):
+            agents_pos[i] = self.agents[i].pos
+            print("agent %d pos: " % i, self.agents[i].pos)
+        return agents_pos
