@@ -14,11 +14,11 @@ class mywindow(QtWidgets.QMainWindow, UI_FORM):
     #这里需要重载一下mywindow，同时也包含了QtWidgets.QMainWindow的预加载项。
         super(mywindow, self).__init__()
         self.MAXSTEP = 500
-        self.Icon_x = 31.25
-        self.Icon_y = 28.125
+        self.Icon_x = 20
+        self.Icon_y = 20
         self.graphic = True
         self.setup_UI(self)
-        self.__ball = env.ball.pos
+        self.__ball = [0, 0]
         self.__agent_num = agt_num
         self.init_Panel(env) #多个智能体面板的时候这里就要修改
         self.doRefresh(env)
@@ -70,35 +70,35 @@ class mywindow(QtWidgets.QMainWindow, UI_FORM):
 
         # Paint football
         self.L_ball.setObjectName('L_ball')
-        self.L_ball.setGeometry(QtCore.QRect(self.__ball[0] * self.Icon_x, self.__ball[1] * self.Icon_y, self.Icon_x, self.Icon_y))
+        self.L_ball.setGeometry(QtCore.QRect(self.__ball[1]*self.Icon_x, self.__ball[0]*self.Icon_y, self.Icon_x, self.Icon_y))
         self.L_ball.setPixmap(self.Ballicon)
         self.L_ball.setScaledContents(True)
 
         # Paint players
         for index, id in enumerate(env.agents_left):
             self.L_player1[index].setObjectName('L_player1'+str(id))
-            self.L_player1[index].setGeometry(QtCore.QRect(self.__all_agents_pos[id][0] * self.Icon_x, self.__all_agents_pos[id][1] * self.Icon_y, self.Icon_x, self.Icon_y))
+            self.L_player1[index].setGeometry(QtCore.QRect(self.__all_agents_pos[id][1] * self.Icon_x, self.__all_agents_pos[id][0] * self.Icon_y, self.Icon_x, self.Icon_y))
             self.L_player1[index].setPixmap(self.Player1icon[0])
             self.L_player1[index].setScaledContents(True)
         
-        for i in env.agents_right:
+        for index, id in enumerate(env.agents_right):
             self.L_player2[index].setObjectName('L_player2'+str(id))
-            self.L_player2[index].setGeometry(QtCore.QRect(self.__all_agents_pos[id][0] * self.Icon_x, self.__all_agents_pos[id][1] * self.Icon_y, self.Icon_x, self.Icon_y))
+            self.L_player2[index].setGeometry(QtCore.QRect(self.__all_agents_pos[id][1] * self.Icon_x, self.__all_agents_pos[id][0] * self.Icon_y, self.Icon_x, self.Icon_y))
             self.L_player2[index].setPixmap(self.Player2icon[0])
             self.L_player2[index].setScaledContents(True)
 
     # 重绘事件
     def RePaint(self, env):
         # Paint football
-        self.L_ball.setGeometry(QtCore.QRect(self.__ball[0] * self.Icon_x, self.__ball[1] * self.Icon_y, self.Icon_x, self.Icon_y))
+        self.L_ball.setGeometry(QtCore.QRect(self.__ball[1]*self.Icon_x+25, self.__ball[0]*self.Icon_y+30, self.Icon_x*0.5, self.Icon_y*0.5))
 
         # Paint players
         for index, id in enumerate(env.agents_left):
-            self.L_player1[index].setGeometry(QtCore.QRect(self.__all_agents_pos[id][0] * self.Icon_x, self.__all_agents_pos[id][1] * self.Icon_y, self.Icon_x, self.Icon_y))
+            self.L_player1[index].setGeometry(QtCore.QRect(self.__all_agents_pos[id][1]*self.Icon_x, self.__all_agents_pos[id][0]*self.Icon_y, self.Icon_x*2, self.Icon_y*2))
             self.L_player1[index].setPixmap(self.Player1icon[0])
 
-        for index, id in enumerate(env.agents_left):
-            self.L_player2[index].setGeometry(QtCore.QRect(self.__all_agents_pos[id][0] * self.Icon_x, self.__all_agents_pos[id][1] * self.Icon_y, self.Icon_x, self.Icon_y))
+        for index, id in enumerate(env.agents_right):
+            self.L_player2[index].setGeometry(QtCore.QRect(self.__all_agents_pos[id][1]*self.Icon_x, self.__all_agents_pos[id][0]*self.Icon_y, self.Icon_x*2, self.Icon_y*2))
             self.L_player2[index].setPixmap(self.Player2icon[0])
 
         # 设置信息面板为空, 刷新面板
@@ -113,10 +113,12 @@ if __name__ == '__main__': #如果整个程序是主程序
     app = 0
     app = QtWidgets.QApplication(sys.argv)
     #生成 mywindow 类的实例。
-    env = Football_Env(agents_left=[1, 2], agents_right=[3, 4],
+    env = Football_Env(agents_left=[1,2,3], agents_right=[4,5,6],
     max_episode_steps=500, move_reward_weight=1.0,
-    court_width=24, court_height=18, gate_width=6)
+    court_width=23, court_height=20, gate_width=6)
     env.reset()
+    print("attack court: ", env.attack_court)
+    print("ball pos: ", env.ball.pos)
     window = mywindow(1, env)
     #有了实例，就得让它显示，show()是QWidget的方法，用于显示窗口。
     window.show()
