@@ -18,7 +18,6 @@ class mywindow(QtWidgets.QMainWindow, UI_FORM):
         self.Icon_y = 20
         self.graphic = True
         self.setup_UI(self)
-        self.__ball = [0, 0]
         self.__agent_num = agt_num
         self.init_Panel(env) #多个智能体面板的时候这里就要修改
         self.doRefresh(env)
@@ -50,11 +49,16 @@ class mywindow(QtWidgets.QMainWindow, UI_FORM):
         self.Player2icon.append(QtGui.QPixmap('./images/man2.png'))
 
     def doRefresh(self, env): #配合doReset
-        self.__ball = env.ball.pos
         self.__all_agents_pos = self.setCurrent(env)
         self.update()
 
         self.__numStep = [0] * self.__agent_num
+        if(self.graphic):
+            self.RePaint(env)
+
+    def doRefresh_Step(self, env): #配合doStep
+        self.__all_agents_pos = self.setCurrent(env)
+        self.update()
         if(self.graphic):
             self.RePaint(env)
 
@@ -70,7 +74,7 @@ class mywindow(QtWidgets.QMainWindow, UI_FORM):
 
         # Paint football
         self.L_ball.setObjectName('L_ball')
-        self.L_ball.setGeometry(QtCore.QRect(self.__ball[1]*self.Icon_x, self.__ball[0]*self.Icon_y, self.Icon_x, self.Icon_y))
+        self.L_ball.setGeometry(QtCore.QRect(env.ball.pos[1]*self.Icon_x, env.ball.pos[0]*self.Icon_y, self.Icon_x, self.Icon_y))
         self.L_ball.setPixmap(self.Ballicon)
         self.L_ball.setScaledContents(True)
 
@@ -90,7 +94,7 @@ class mywindow(QtWidgets.QMainWindow, UI_FORM):
     # 重绘事件
     def RePaint(self, env):
         # Paint football
-        self.L_ball.setGeometry(QtCore.QRect(self.__ball[1]*self.Icon_x+25, self.__ball[0]*self.Icon_y+30, self.Icon_x*0.5, self.Icon_y*0.5))
+        self.L_ball.setGeometry(QtCore.QRect(env.ball.pos[1]*self.Icon_x+25, env.ball.pos[0]*self.Icon_y+30, self.Icon_x*0.5, self.Icon_y*0.5))
 
         # Paint players
         for index, id in enumerate(env.agents_left):

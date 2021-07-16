@@ -20,16 +20,16 @@ x
 x = pos[0], y = pos[1]
 '''
 
-Observation = namedtuple('Observation', ['team', 'agent_id', 'obs'])
-Actions = namedtuple('Actions', ['team', 'agent_id', 'actions'])
-Rewards = namedtuple('Rewards', ['team', 'agent_id', 'rewards'])
-
 
 class Football_Env:
+    Observation = namedtuple('Observation', ['team', 'agent_id', 'obs'])
+    Actions = namedtuple('Actions', ['team', 'agent_id', 'action'])
+    Rewards = namedtuple('Rewards', ['team', 'agent_id', 'reward'])
+    
     def __init__(self, 
     agents_left: list, agents_right: list, 
     max_episode_steps, move_reward_weight=1.0,
-    court_width=24, court_height=18, gate_width = 6):
+    court_width=23, court_height=20, gate_width = 6):
         self.agents_left = agents_left # list of agent_id in the left court
         self.agents_right = agents_right # list of agent_id in the right court
         self.max_episode_steps = max_episode_steps
@@ -45,8 +45,11 @@ class Football_Env:
         self.n_agents = len(agents_left) + len(agents_right)
         self.agents = {}
         self.ball = Ball()
+        self.Done = False
 
     def reset(self):
+        self.Done = False
+
         # initialize map
         self.reset_map()
 
@@ -60,7 +63,7 @@ class Football_Env:
         # give ball to the attack team
         self.reset_ball_possesion()
         
-        # update map
+        # update map 
         self.update_map()
 
     def reset_map(self):
@@ -134,16 +137,16 @@ class Football_Env:
 
     def get_obs(self):
         obs = []
-        for i in range(self.n_agents):
-            _obs = Observation(self.agents[i].team, self.agents[i].id, self.agents[i]._get_obs(self._map))
+        for i in range(1, self.n_agents + 1):
+            _obs = self.Observation(self.agents[i].team, self.agents[i].id, self.agents[i]._get_obs(self._map))
             obs.append(_obs)
         
         return tuple(obs)
 
     def sample_actions(self):
         actions = []
-        for i in range(self.n_agents):
-            _actions = Actions(self.agents[i].team, self.agents[i].id, self.agents[i]._sample_action())
+        for i in range(1, self.n_agents + 1):
+            _actions = self.Actions(self.agents[i].team, self.agents[i].id, self.agents[i].sample_action())
             actions.append(_actions)
         
         return tuple(actions)
@@ -151,42 +154,66 @@ class Football_Env:
     def agents_past_court(self, id):
         x = self.agents[id].pos[0]
         y = self.agents[id].pos[1]
-        if x < 0 or x >= self.court_width or y < 0 or y >= self.court_height:
+        if x < 0 or x >= self.court_height or y < 0 or y >= self.court_width:
             return True
         return False
 
-    def step(self, actions: list):
+    def step(self, actions: tuple):
+        self.Done = False
         self.elapsed_steps += 1
         done_rewards, move_rewards, goal_rewards = [], [], []
         dones = []
-        infos = []
-        for i in range(self.n_agents):
-            agent_done, done_reward = self.get_done_rewards(self.agents[i], actions[i])
+        infos = {"attack_team": [], "defend_team": []}
+        for i in range(1, self.n_agents + 1):
+            agent_info = {"id": None, "reward_details": None, "move_details": None}
+            agent_info["id"] = i
+
+            move_details = {"action": None, "last_position": None, "current_position": None}
+            move_details["action"] = actions[i - 1].action
+            move_details["last_position"] = self.agents[i].pos
+
+            # print("agent %d pos1: " % i, self.agents[i].pos, " action: ", actions[i - 1].action)
+            agent_done, done_reward = self.get_done_rewards(self.agents[i], actions[i - 1].action)
+            move_details["current_position"] = self.agents[i].pos
+            # print("agent %d pos2: " % i, self.agents[i].pos)
             dones += agent_done
             done_rewards.append(done_reward)
-            move_reward, rew_info = self.get_move_rewards(self.agents[i], actions[i])
+
+            move_reward, rew_info = self.get_move_rewards(self.agents[i], actions[i - 1].action)
             move_rewards.append(move_reward)
-            goal_reward = self.get_goal_rewards(actions[i])
+
+            goal_reward = self.get_goal_rewards(self.agents[i], actions[i - 1].action)
             goal_rewards.append(goal_reward)
+
             rew_info["done_reward"] = done_reward
             rew_info["goal_reward"] = goal_reward
-            infos.append(rew_info)
+
+            agent_info["reward_details"] = rew_info
+            agent_info["move_details"] = move_details
+
+            if self.agents[i].team == "attack":
+                infos["attack_team"].append(agent_info)
+            if self.agents[i].team == "defend":
+                infos["defend_team"].append(agent_info)
+
 
         rewards = []
         for i in range(self.n_agents):
             rew = float(goal_rewards[i] + done_rewards[i] + self.move_reward_weight * move_rewards[i])
-            reward = Rewards(team=self.agents[i].team, agent_id=i, rewards=rew)
+            reward = self.Rewards(team=self.agents[i + 1].team, agent_id=i + 1, reward=rew)
             rewards.append(reward)
         rewards = tuple(rewards)
         done = True in dones
+        self.Done = done
+        if not done:
+            self.update_map()
         obs = self.get_obs()
-        infos = tuple(infos)
 
         return obs, rewards, done, infos
 
-    def get_goal_rewards(self, action):
+    def get_goal_rewards(self, agent, action):
         if action == 6:
-            is_score = self.ball.check_ball_score()
+            is_score = self.ball.check_ball_score(agent.team, agent.court_id, self.court_width, self.court_height, self.gate_width)
             if is_score:
                 return self.GOAL_REWARD
             else:
@@ -197,13 +224,13 @@ class Football_Env:
     def get_done_rewards(self, agent, action):
         dones = []
         done_reward = 0.0
-        agent.pos, self.ball.pos = agent.simulate_move(action, self._map, self.ball)
-        self.update_map()
+        agent_pos, self.ball.pos, _, _ = agent.simulate_move(action, self._map, self.ball, self.agents)
+        self.agents[agent.id].pos = agent_pos
         dones.append(self.agents_conflict)
         if self.agents_past_court(agent.id):
             dones.append(True)
             done_reward -= 1.0
-        if self.ball.check_ball_pass_court():
+        if self.ball.check_ball_pass_court(self._map):
             dones.append(True)
             done_reward -= 1.0
         if self.ball.check_ball_score(agent.team, agent.court_id, self.court_width, self.court_height):
@@ -213,7 +240,7 @@ class Football_Env:
         return dones, done_reward
 
     def get_move_rewards(self, agent, action):
-        move_reward, rew_info = agent.after_step(action)
+        move_reward, rew_info = agent.after_step(action, self._map, self.ball, self.agents)
         
         return move_reward, rew_info
 
@@ -221,5 +248,4 @@ class Football_Env:
         agents_pos = dict()
         for i in range(1, self.n_agents + 1):
             agents_pos[i] = self.agents[i].pos
-            print("agent %d pos: " % i, self.agents[i].pos)
         return agents_pos
