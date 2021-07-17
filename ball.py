@@ -11,6 +11,7 @@ class Ball:
 
     def move(self, source, destination, _map): # the see_around() function in Player ensures that source != destination
         # need to be modefied!!
+        self.blocked = False
         if destination[0] != source[0] and destination[1] != source[1]:
             k = (destination[1] - source[1]) / (destination[0] - source[0])
             b = source[1] - k * source[0]

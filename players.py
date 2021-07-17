@@ -123,7 +123,7 @@ class Players:
                 pass_agent_pos = random.choice(agents_pos_around)
                 if action == 5 and self.posses_ball: # Pass
                     # if the ball runs into boundary or defenders it will be stoped and one episode done
-                    # print("pass")
+                    print("pass")
                     ball.move(self.pos, pass_agent_pos, _map)
                     virtual_ball_pos = ball.pos
                     if ball.blocked:
@@ -139,7 +139,6 @@ class Players:
                 virtual_ball_pos = ball.pos
                 if ball.blocked:
                     block_agent_id = _map[ball.pos[0]][ball.pos[1]]
-                    # print("in players, agent team: ", agents[block_agent_id].team)
                     if agents[block_agent_id].team == "defend":
                         shoot_blocked = True
             if action == 5 or action == 6:
