@@ -1,3 +1,3 @@
 # My Football Environment for Multi-Agent Reinforcement Learning !
 
-![Getting Started](./mindmap.png)
+![Getting Started](./env_mindmap.png)
