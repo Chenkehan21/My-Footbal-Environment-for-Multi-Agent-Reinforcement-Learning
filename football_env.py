@@ -39,6 +39,8 @@ class Football_Env:
         self.move_reward_weight = move_reward_weight
         self.elapsed_steps = 0
         self.GOAL_REWARD = 10.0
+        self.tackle_reward = 0.
+        self.tackle_winner = None
         self.agents_conflict = False
         self.previous_map = None
         self._map = None
@@ -46,9 +48,13 @@ class Football_Env:
         self.agents = {}
         self.ball = Ball()
         self.Done = False
+        self.attack_action_space_n = 7
+        self.defend_action_space_n = 5
+        self.winner = []
 
     def reset(self):
         self.Done = False
+        self.elapsed_steps = 0
 
         # initialize map
         self.reset_map()
@@ -65,6 +71,12 @@ class Football_Env:
         
         # update map 
         self.update_map()
+
+        # for i in range(1, self.n_agents + 1):
+        #     print("agent %d pos1: " % i, self.agents[i].pos, "|action: ", end='|')
+        #     print("agent %d pos2: " % i, self.agents[i].pos, "|ball_pos", self.ball.pos, "|posses ball: ", self.agents[i].posses_ball)
+
+        return self.get_obs()
 
     def reset_map(self):
         self.previous_map = np.zeros([self.court_height, self.court_width])
@@ -94,7 +106,8 @@ class Football_Env:
 
     def reset_agents_team(self):
         team_choices = ["attack", "defend"]
-        left_court_team = random.choice(team_choices)
+        # left_court_team = random.choice(team_choices)
+        left_court_team = 'attack'
         team_choices.remove(left_court_team)
         right_court_team = team_choices[0]
         if left_court_team == "attack":
@@ -119,6 +132,7 @@ class Football_Env:
     
     def reset_ball_possesion(self):
         for agent in self.agents.values():
+            agent.posses_ball = False
             if agent.court_id == self.attack_court:
                 self.ball.give_ball_possession(agent.pos)
                 agent.posses_ball = True
@@ -134,6 +148,10 @@ class Football_Env:
             else:
                 print("agents contact!")
                 self.agents_conflict = True
+                agent_id = self._map[agent.pos[0]][agent.pos[1]]
+                if self.agents[agent_id].team != agent.team and (self.agents[agent_id].posses_ball or agent.posses_ball):
+                    self.tackle_reward = 5.0
+                    self.tackle_winner = 'defend'
 
     def get_obs(self):
         obs = []
@@ -159,31 +177,35 @@ class Football_Env:
         return False
 
     def step(self, actions: tuple):
+        self.winner = []
         self.Done = False
-        self.elapsed_steps += 1
         done_rewards, move_rewards, goal_rewards = [], [], []
         dones = []
-        infos = {"attack_team": [], "defend_team": []}
+        infos = {"attack_team": [], "defend_team": [], "ball_pos": None, "winner": None}
+        # print("self.n_agents: ", self.n_agents)
         for i in range(1, self.n_agents + 1):
-            agent_info = {"id": None, "reward_details": None, "move_details": None}
+            agent_info = {"id": None, "posses_ball": None, "reward_details": None, "move_details": None}
             agent_info["id"] = i
+            agent_info["posses_ball"] = self.agents[i].posses_ball
 
             move_details = {"action": None, "last_position": None, "current_position": None}
-            move_details["action"] = actions[i - 1].action
+            # print("actions: ", actions)
+            move_details["action"] = actions[i - 1]
             move_details["last_position"] = self.agents[i].pos
 
-            # print("agent %d pos1: " % i, self.agents[i].pos, " action: ", actions[i - 1].action)
-            agent_done, done_reward = self.get_done_rewards(self.agents[i], actions[i - 1].action)
+            move_reward, rew_info, move_done = self.get_move_rewards(self.agents[i], actions[i - 1])
+            move_rewards.append(move_reward)
+            dones += move_done
+
+            goal_reward = self.get_goal_rewards(self.agents[i], actions[i - 1])
+            goal_rewards.append(goal_reward)
+
+            # print("agent %d pos1: " % i, self.agents[i].pos, "|action: ", actions[i - 1], end='|')
+            agent_done, done_reward = self.get_done_rewards(self.agents[i], actions[i - 1])
             move_details["current_position"] = self.agents[i].pos
-            # print("agent %d pos2: " % i, self.agents[i].pos)
+            # print("agent %d pos2: " % i, self.agents[i].pos, "|ball_pos", self.ball.pos, "|posses ball: ", self.agents[i].posses_ball)
             dones += agent_done
             done_rewards.append(done_reward)
-
-            move_reward, rew_info = self.get_move_rewards(self.agents[i], actions[i - 1].action)
-            move_rewards.append(move_reward)
-
-            goal_reward = self.get_goal_rewards(self.agents[i], actions[i - 1].action)
-            goal_rewards.append(goal_reward)
 
             rew_info["done_reward"] = done_reward
             rew_info["goal_reward"] = goal_reward
@@ -195,7 +217,13 @@ class Football_Env:
                 infos["attack_team"].append(agent_info)
             if self.agents[i].team == "defend":
                 infos["defend_team"].append(agent_info)
+            infos["ball_pos"] = self.ball.pos
 
+        self.elapsed_steps += 1
+        # print("elapsed steps: ", self.elapsed_steps)
+        if self.elapsed_steps >= self.max_episode_steps:
+            print("max episode steps elapsed!")
+            dones.append(True)
 
         rewards = []
         for i in range(self.n_agents):
@@ -206,43 +234,71 @@ class Football_Env:
         done = True in dones
         self.Done = done
         if not done:
+            # print("***update map***")
             self.update_map()
+            self.winner.append(self.tackle_winner)
+        if done:
+            if self.winner:
+                infos['winner'] = self.winner[0]
+            if len(self.winner) == 0 and self.elapsed_steps >= self.max_episode_steps:
+                infos['winner'] = 'tie'
         obs = self.get_obs()
+        # print("winner list: ", self.winner)
 
         return obs, rewards, done, infos
 
     def get_goal_rewards(self, agent, action):
-        if action == 6:
+        if action == 6 and agent.posses_ball:
             is_score = self.ball.check_ball_score(agent.team, agent.court_id, self.court_width, self.court_height, self.gate_width)
             if is_score:
+                print("shoot score!")
+                self.winner.append("attack")
                 return self.GOAL_REWARD
             else:
-                return 0.0
+                # print("shoot not score.")
+                self.winner.append("defend")
+                return -self.GOAL_REWARD
         else:
             return 0.0
 
     def get_done_rewards(self, agent, action):
         dones = []
         done_reward = 0.0
-        agent_pos, self.ball.pos, _, _ = agent.simulate_move(action, self._map, self.ball, self.agents)
-        self.agents[agent.id].pos = agent_pos
         dones.append(self.agents_conflict)
         if self.agents_past_court(agent.id):
+            print("agent %d past court!" % agent.id)
             dones.append(True)
             done_reward -= 1.0
+            if agent.team == "attack":
+                self.winner.append("defend")
+            if agent.team == "defend":
+                self.winner.append("attack")
+        
         if self.ball.check_ball_pass_court(self._map):
+            # print("ball past court!")
             dones.append(True)
             done_reward -= 1.0
+            if agent.team == "attack":
+                self.winner.append("defend")
+            if agent.team == "defend":
+                self.winner.append("attack")
+
         if self.ball.check_ball_score(agent.team, agent.court_id, self.court_width, self.court_height):
             dones.append(True)
             done_reward += 1.0
+            
 
         return dones, done_reward
 
     def get_move_rewards(self, agent, action):
-        move_reward, rew_info = agent.after_step(action, self._map, self.ball, self.agents)
-        
-        return move_reward, rew_info
+        move_reward, rew_info, winner, virtual_agent_pos, virtual_ball_pos, done = agent.after_step(action, self._map, self.ball, self.agents)
+        self.agents[agent.id].pos = virtual_agent_pos
+        self.ball.pos = virtual_ball_pos
+
+        if winner != None:
+            self.winner.append(winner)
+
+        return move_reward, rew_info, [done]
 
     def get_all_pos(self):
         agents_pos = dict()
