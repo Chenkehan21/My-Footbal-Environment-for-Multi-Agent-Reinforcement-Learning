@@ -45,9 +45,9 @@ class Panel_Control:
 
     def doStep(self):
         print("do step, trained team: ", self.train_team)
-        state = self.env.reset()
+        all_state = self.env.reset()
         if self.train_team:
-            state = handle_obs(state, self.train_team)
+            state = handle_obs(all_state, self.train_team)
 
         if self.train_team == "attack":
             output_shape = self.env.attack_action_space_n
@@ -71,7 +71,7 @@ class Panel_Control:
                 trained_attack_net.load_state_dict(torch.load(self.attack_net_path))
 
         total_reward = 0.0
-        all_state = self.env.reset()
+        # all_state = self.env.reset()
 
 
         while not self.env.Done:
@@ -148,7 +148,7 @@ class Panel_Control:
                 for action in all_actions:
                     actions.append(action.action)
             
-            # print("actions: ", actions)
+            print("actions: ", actions)
             next_state, rewards, done, info = self.env.step(actions)
 
             for rew in rewards:

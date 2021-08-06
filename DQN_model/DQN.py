@@ -33,8 +33,8 @@ EPSILON_DECAY_LAST_FRAMES = 10000 # during the first 150,000 frames, epsilon is 
 EPSILON_START = 1.0
 EPSILON_END = 0.01
 
-SAVE_PATH_ATTACK = './DQN_model/res_attack'
-SAVE_PATH_DEFEND = './DQN_model/res_defend'
+SAVE_PATH_ATTACK = './DQN_model/res_attack4'
+SAVE_PATH_DEFEND = './DQN_model/res_defend2'
 
 
 Experience = collections.namedtuple("Experience", field_names=["state", "action", "reward", "done", "next_state"])
@@ -122,7 +122,7 @@ class Agent:
                     actions.append(action.action)
         
         # step action
-        # print("actions: ", actions)
+        print("actions: ", actions)
         next_state, rewards, done, info = self.env.step(actions)
         next_state = handle_obs(next_state, self.train_team)
         for rew in rewards:

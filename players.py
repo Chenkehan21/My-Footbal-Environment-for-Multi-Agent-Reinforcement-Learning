@@ -79,7 +79,7 @@ class Players:
 
         while len(agents_around) != 9:
             agents_around.append(0)
-            
+
         return agents_around, agents_pos_around
 
     def get_gate_pos(self):
@@ -255,30 +255,34 @@ class Players:
             self.actions.clear()
         if len(self.actions) > 1000:
             self.actions.clear() # avoid memory leak
+        
+        shoot_pos = self.can_shoot()
 
         if self.team == "attack":
             if self.court_id == "left" and action == 4:
-                attack_reward += 2.0
+                attack_reward += 1.0
             if self.court_id == "left" and action == 3:
-                attack_reward += 0
+                attack_reward += -1.0
             if self.court_id == "right" and action == 3:
-                attack_reward += 2.0
+                attack_reward += 1.0
             if self.court_id == "right" and action == 4:
-                attack_reward += 0
+                attack_reward += -1.0
+            if action == 6 and shoot_pos != None:
+                attack_reward += 7.0
 
         if self.team == "defend":
             if self.pos[0] - ball.pos[0] < 0 and action == 2:
-                defend_reward += 2.0
+                defend_reward += 1.0
             if  self.pos[0] - ball.pos[0] < 0 and action == 1:
-                defend_reward += 0
+                defend_reward += -1.0
             if self.pos[0] - ball.pos[0] > 0 and action == 1:
-                defend_reward = 2.0
+                defend_reward = 1.0
             if self.pos[0] - ball.pos[0] > 0 and action == 2:
-                defend_reward += 0
+                defend_reward += -1.0
             if self.pos[0] - ball.pos[0] == 0 and (action == 1 or action ==2):
-                defend_reward += 0
+                defend_reward += -1.0
             if self.pos[0] - ball.pos[0] == 0 and (action != 1 and action != 2):
-                defend_reward += 2.0
+                defend_reward += 1.0
 
             if self.pos[1] - ball.pos[1] < 0 and action == 4:
                 defend_reward += 1.0
@@ -286,7 +290,7 @@ class Players:
                 defend_reward += 1.0
 
             if pass_blocked or shoot_blocked:
-                block_reward = 10.0
+                block_reward = 20.0
                 winner = "defend"
 
         reward = attack_reward + defend_reward + block_reward + stand_still_penalty

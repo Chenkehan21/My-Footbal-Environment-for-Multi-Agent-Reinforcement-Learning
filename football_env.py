@@ -4,6 +4,7 @@ from players import Players
 from ball import Ball
 import math
 from collections import namedtuple
+import time
 
 
 '''
@@ -38,7 +39,7 @@ class Football_Env:
         self.gate_width = gate_width
         self.move_reward_weight = move_reward_weight
         self.elapsed_steps = 0
-        self.GOAL_REWARD = 10.0
+        self.GOAL_REWARD = 100.0
         self.tackle_reward = 0.
         self.tackle_winner = None
         self.agents_conflict = False
@@ -226,6 +227,7 @@ class Football_Env:
             dones.append(True)
 
         rewards = []
+        print("goal rewards: ", goal_rewards)
         for i in range(self.n_agents):
             rew = float(goal_rewards[i] + done_rewards[i] + self.move_reward_weight * move_rewards[i])
             reward = self.Rewards(team=self.agents[i + 1].team, agent_id=i + 1, reward=rew)
@@ -251,13 +253,14 @@ class Football_Env:
         if action == 6 and agent.posses_ball:
             is_score = self.ball.check_ball_score(agent.team, agent.court_id, self.court_width, self.court_height, self.gate_width)
             if is_score:
-                print("shoot score!")
+                print("=====shoot score!====")
+                # time.sleep(1)
                 self.winner.append("attack")
                 return self.GOAL_REWARD
             else:
                 # print("shoot not score.")
                 self.winner.append("defend")
-                return -self.GOAL_REWARD
+                return 0
         else:
             return 0.0
 
