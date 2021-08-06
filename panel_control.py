@@ -44,9 +44,10 @@ class Panel_Control:
     #             break
 
     def doStep(self):
-        print("do step dqn, trained team: ", self.train_team)
+        print("do step, trained team: ", self.train_team)
         state = self.env.reset()
-        state = handle_obs(state, self.train_team)
+        if self.train_team:
+            state = handle_obs(state, self.train_team)
 
         if self.train_team == "attack":
             output_shape = self.env.attack_action_space_n
@@ -74,9 +75,10 @@ class Panel_Control:
 
 
         while not self.env.Done:
-            state = handle_obs(all_state, self.train_team)
-            state_a = np.array(state, copy=False) # add an dimension for BATCH_SIZE!
-            state_v = torch.tensor(state_a, dtype=torch.float).to(self.device)
+            if self.train_team:
+                state = handle_obs(all_state, self.train_team)
+                state_a = np.array(state, copy=False) # add an dimension for BATCH_SIZE!
+                state_v = torch.tensor(state_a, dtype=torch.float).to(self.device)
             
             AI_state = []
             if self.train_team == 'attack':
@@ -106,7 +108,6 @@ class Panel_Control:
                     AI_q_values = trained_defend_net(AI_state_v)
                     _, AI_action_v = torch.max(AI_q_values, dim=0)
                     AI_action = int(AI_action_v.item())
-                    print("AI action: ", AI_action)
                 else:
                     for action in all_actions:
                         if action.team == 'defend':
