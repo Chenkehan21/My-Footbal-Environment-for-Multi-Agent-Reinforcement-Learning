@@ -8,17 +8,35 @@ import time
 
 
 '''
-map:
-(0,0)------------------> y
-|
-|
-|     . pos(x, y)
-|
-|
-|
-x
 
-x = pos[0], y = pos[1]
+map:                             width: 23
+            (0,0)------------------------------------------------> y
+            |
+            |
+            |                      . agent_pos(x, y)
+            |
+            |--
+height: 20  | | 
+            | |gate range: 6
+            | |
+            | |
+            |--
+            |
+            |
+            |
+            |
+            x
+ 
+x = agent_pos[0], y = agent_pos[1]
+
+gate range:   [gate_center - 2, gate_center - 1, gate_center, gate_center + 1, gate_center + 2]
+
+success rate: [0.3,             0.6,             0.9,         0.6,             0.3            ]
+
+shoot range:  [agent_pos - 1, agent_pos, agent_pos + 1]
+
+shoot distance: 1/4 * court_width
+
 '''
 
 
@@ -39,8 +57,10 @@ class Football_Env:
         self.gate_width = gate_width
         self.move_reward_weight = move_reward_weight
         self.elapsed_steps = 0
-        self.GOAL_REWARD = 100.0
-        self.tackle_reward = 0.
+        self.GOAL_REWARD = 10.0
+        self.tackle_reward = 0.0
+        self.score_defend_penalty = 0.0
+        self.defender_block_reward = 0.0
         self.tackle_winner = None
         self.agents_conflict = False
         self.previous_map = None
@@ -56,6 +76,11 @@ class Football_Env:
     def reset(self):
         self.Done = False
         self.elapsed_steps = 0
+        self.tackle_reward = 0.0
+        self.score_defend_penalty = 0.0
+        self.defender_block_reward = 0.0
+        self.tackle_winner = None
+        self.winner = []
 
         # initialize map
         self.reset_map()
@@ -89,21 +114,59 @@ class Football_Env:
         left_court_end = left_court_start + steps
         right_court_start = self.court_width - steps
         right_court_end = self.court_width
+        gate_center = int(self.gate_width / 2)
+        gate_range = list(range(int(self.court_height / 2) - int(self.gate_width / 2), 
+                    int(self.court_height / 2) + int(self.gate_width / 2) + 1))
+
+        # if agent.court_id == "left":
+        #     y = random.choice(list(range(left_court_start, left_court_end))) # top left conner is (0, 0)
+        #     x = random.choice(list(range(0, self.court_height)))
+        #     if self._map[x][y] != 0:
+        #         self.reset_agent_position(agent)
+        #     else:
+        #         agent.pos = [x, y]
+
+        # if agent.court_id == "right":
+        #     y = random.choice(list(range(right_court_start, right_court_end))) # top left conner is (0, 0)
+        #     x = random.choice(list(range(0, self.court_height)))
+        #     if self._map[x][y] != 0:
+        #         self.reset_agent_position(agent)
+        #     else:
+        #         agent.pos = [x, y]
+
+
 
         if agent.court_id == "left":
-            y = random.choice(list(range(left_court_start, left_court_end))) # top left conner is (0, 0)
-            x = random.choice(list(range(0, self.court_height)))
-            if self._map[x][y] != 0:
-                self.reset_agent_position(agent)
-            else:
-                agent.pos = [x, y]
+            if agent.team == "attack":
+                x = random.choice(list(range(0, self.court_height)))
+                y = random.choice(list(range(left_court_start, int(left_court_end / 3))))
+                if self._map[x][y] != 0:
+                    self.reset_agent_position(agent)
+                else:
+                    agent.pos = [x, y]
+            if agent.team == "defend":
+                x = random.choice(gate_range)
+                y = random.choice(list(range(left_court_start, int(left_court_end / 3))))
+                if self._map[x][y] != 0:
+                    self.reset_agent_position(agent)
+                else:
+                    agent.pos = [x, y]
+            
         if agent.court_id == "right":
-            y = random.choice(list(range(right_court_start, right_court_end))) # top left conner is (0, 0)
-            x = random.choice(list(range(0, self.court_height)))
-            if self._map[x][y] != 0:
-                self.reset_agent_position(agent)
-            else:
-                agent.pos = [x, y]
+            if agent.team == "attack":
+                x = random.choice(list(range(0, self.court_height)))
+                y = random.choice(list(range(right_court_end - 3, right_court_end)))
+                if self._map[x][y] != 0:
+                    self.reset_agent_position(agent)
+                else:
+                    agent.pos = [x, y]
+            if agent.team == "defend":
+                x = random.choice(gate_range)
+                y = random.choice(list(range(right_court_end - 5, right_court_end)))
+                if self._map[x][y] != 0:
+                    self.reset_agent_position(agent)
+                else:
+                    agent.pos = [x, y]
 
     def reset_agents_team(self):
         team_choices = ["attack", "defend"]
@@ -180,6 +243,7 @@ class Football_Env:
     def step(self, actions: tuple):
         self.winner = []
         self.Done = False
+        self.score_defend_penalty = 0.0
         done_rewards, move_rewards, goal_rewards = [], [], []
         dones = []
         infos = {"attack_team": [], "defend_team": [], "ball_pos": None, "winner": None}
@@ -195,6 +259,14 @@ class Football_Env:
             move_details["last_position"] = self.agents[i].pos
 
             move_reward, rew_info, move_done = self.get_move_rewards(self.agents[i], actions[i - 1])
+
+            if self.agents[i].team == 'defend':
+                if self.defender_block_reward != 0:
+                    print("defender block reward: ", self.defender_block_reward)
+                    # time.sleep(3)
+                move_reward += self.defender_block_reward
+                self.defender_block_reward = 0.0
+
             move_rewards.append(move_reward)
             dones += move_done
 
@@ -227,7 +299,11 @@ class Football_Env:
             dones.append(True)
 
         rewards = []
-        print("goal rewards: ", goal_rewards)
+
+        # if self.GOAL_REWARD in goal_rewards or self.score_defend_penalty in goal_rewards and self.score_defend_penalty != 0:
+        #     print("goal rewards: ", goal_rewards)
+        #     time.sleep(1)
+
         for i in range(self.n_agents):
             rew = float(goal_rewards[i] + done_rewards[i] + self.move_reward_weight * move_rewards[i])
             reward = self.Rewards(team=self.agents[i + 1].team, agent_id=i + 1, reward=rew)
@@ -256,11 +332,14 @@ class Football_Env:
                 print("=====shoot score!====")
                 # time.sleep(1)
                 self.winner.append("attack")
+                self.score_defend_penalty = -self.GOAL_REWARD
                 return self.GOAL_REWARD
             else:
                 # print("shoot not score.")
                 self.winner.append("defend")
                 return 0
+        elif agent.team == 'defend' and self.score_defend_penalty != 0:
+            return self.score_defend_penalty
         else:
             return 0.0
 
@@ -271,7 +350,7 @@ class Football_Env:
         if self.agents_past_court(agent.id):
             print("agent %d past court!" % agent.id)
             dones.append(True)
-            done_reward -= 1.0
+            done_reward -= 20.0
             if agent.team == "attack":
                 self.winner.append("defend")
             if agent.team == "defend":
@@ -294,12 +373,17 @@ class Football_Env:
         return dones, done_reward
 
     def get_move_rewards(self, agent, action):
-        move_reward, rew_info, winner, virtual_agent_pos, virtual_ball_pos, done = agent.after_step(action, self._map, self.ball, self.agents)
+        move_reward, rew_info, winner, virtual_agent_pos, virtual_ball_pos, done, block = agent.after_step(action, self._map, self.ball, self.agents)
         self.agents[agent.id].pos = virtual_agent_pos
         self.ball.pos = virtual_ball_pos
 
         if winner != None:
             self.winner.append(winner)
+        
+        if block:
+            print("***********block***********")
+            self.defender_block_reward = 100.0
+        rew_info['block'] = self.defender_block_reward
 
         return move_reward, rew_info, [done]
 

@@ -20,11 +20,11 @@ if __name__ == "__main__":
     court_width=23, court_height=20, gate_width=6)
     env.reset()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    defend_net_path = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_model/res_win_rate/football_0.880_66.500.dat'
-    attack_net_path = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_model/res_attack4/football_95.760_0.960.dat'
+    defend_net_path = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_model/res_defend4/football_0.640_133.390.dat'
+    attack_net_path = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_model/res_attack5/football_0.890_72.300.dat'
     window = mywindow(2, env)
     control = Panel_Control(env, window, train_team='attack', device=device, 
                             defend_net_path=defend_net_path, attack_net_path=attack_net_path,
-                            use_trained_defend_net=False, use_trained_attack_net=True)
+                            use_trained_defend_net=True, use_trained_attack_net=True)
     window.show()
     sys.exit(app.exec_())

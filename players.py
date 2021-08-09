@@ -1,7 +1,9 @@
 import numpy as np
 import random
 import itertools
+import time
 import math
+
 
 class Players:
     '''
@@ -33,6 +35,7 @@ class Players:
         self._map = _map
         self.actions = []
         self.gate_pos = self.get_gate_pos()
+        self.success_rate = self.get_success_rate()
         self.posses_ball = False
         self.log = True
         self.miss_prob = 0.4
@@ -87,16 +90,18 @@ class Players:
                 [i, 0] for i in 
                 range(
                     int(self.court_height / 2) - int(self.gate_width / 2), 
-                    int(self.court_height / 2) + int(self.gate_width / 2) + 1
+                    int(self.court_height / 2) + math.ceil(self.gate_width / 2)
                     )
             ]
+
         right_gate_pos = [
                 [i, self.court_width - 1] for i in 
                 range(
                     int(self.court_height / 2) - int(self.gate_width / 2), 
-                    int(self.court_height / 2) + int(self.gate_width / 2) + 1
+                    int(self.court_height / 2) + math.ceil(self.gate_width / 2)
                     )
             ]
+
         if self.court_id == "left":
             my_gate_pos = left_gate_pos
             attack_gate_pos = right_gate_pos
@@ -106,15 +111,42 @@ class Players:
         
         return [my_gate_pos, attack_gate_pos]
 
+    def get_success_rate(self):
+        gate_range = list(range(
+                    int(self.court_height / 2) - int(self.gate_width / 2), 
+                    int(self.court_height / 2) + math.ceil(self.gate_width / 2)))
+        gate_center = []
+        if len(gate_range) % 2 == 0:
+            gate_center += [gate_range[len(gate_range) // 2 - 1], gate_range[len(gate_range) // 2]]
+        else:
+            gate_center.append(gate_range[len(gate_range) // 2])
+        
+        step1 = int((len(gate_range) - len(gate_center)) // 4)
+        step2 = int((len(gate_range) - len(gate_center) - step1 * 2) / 2)
+        range1 = gate_range[:step1] + gate_range[-step1:]
+        range2 = gate_range[step1: step2 + step1] + gate_range[-step2 - step1 : -step1]
+
+        success_rate = dict()
+
+        for pos in gate_center:
+            success_rate[pos] = 0.9
+
+        for pos in range1:
+            success_rate[pos] = 0.3
+        
+        for pos in range2:
+            success_rate[pos] = 0.6
+        
+        return success_rate
+
     def can_shoot(self):
         pos_condition = False
         gate_condition = False
         shoot_range = [self.pos[0] - 1, self.pos[0], self.pos[0] + 1]
-
         if self.team == 'attack':
-            if self.court_id == 'left' and self.pos[1] > self.court_width / 2:
+            if self.court_id == 'left' and self.pos[1] > self.court_width * 0.75 and self.pos[1] != self.court_width - 1:
                 pos_condition = True
-            elif self.court_id == 'right' and self.pos[1] < self.court_width / 2:
+            elif self.court_id == 'right' and self.pos[1] < self.court_width * 0.25 and self.pos[1] != 0:
                 pos_condition = True
             attack_gate_pos = self.gate_pos[1]
             attack_gate_range = [x[0] for x in attack_gate_pos]
@@ -166,21 +198,21 @@ class Players:
                     # if the ball runs into boundary or defenders it will be stoped and one episode done
                     if self.log:
                         print("agent %d pass ball to agent %d" % (self.id, pass_agent_id))
-                    virtual_ball_pos = ball.move(self.pos, pass_agent_pos, _map)
+                    virtual_ball_pos = ball.move2(self.pos, pass_agent_pos, agents)
                     if ball.blocked:
                         # print("pass block 1")
-                        block_agent_id = _map[virtual_ball_pos[0]][virtual_ball_pos[1]]
-                        if agents[block_agent_id].team == "defend":
-                            if self.log:
-                                print("====pass blocked!====")
-                            pass_blocked = True
+                        if self.log:
+                            print("====pass blocked!====")
+                        pass_blocked = True
                     else:
                         agents[pass_agent_id].posses_ball = True
             if action == 6 and self.posses_ball: # Shoot
                 shoot_pos = self.can_shoot()
                 if shoot_pos != None:
-                    if self.log:
-                        print("agent %d shoot" % self.id, " agent pos: ", self.pos)
+                    # if self.log:
+                    #     print("agent %d shoot" % self.id, " agent pos: ", self.pos)
+                    #     print("shoot pos: ", shoot_pos)
+
                     # attack_gate_pos = self.gate_pos[1]
                     # print(attack_gate_pos)
                     # possible_shoot_pos = []
@@ -211,21 +243,16 @@ class Players:
                     # else:
                     #     shoot_pos = random.choice(possible_shoot_pos)
                     # shoot_pos = attack_pos
-                    if self.log:
-                        print("shoot pos: ", shoot_pos)
-                    virtual_ball_pos = ball.move(self.pos, shoot_pos, _map)
-                    if ball.blocked:
-                        # print("shoot block 1")
-                        block_agent_id = _map[virtual_ball_pos[0]][virtual_ball_pos[1]]
-                        if self.log:
-                            print("block agent id: ", block_agent_id)
-                        if agents[block_agent_id].team == "defend":
-                            if self.log:
-                                print("====shoot blocked!====")
+                    
+                    shoot_success_rate = self.success_rate[shoot_pos[0]]
+                    if random.random() <= shoot_success_rate:
+                        virtual_ball_pos = ball.move2(self.pos, shoot_pos, agents)
+                        if ball.blocked:
                             shoot_blocked = True
-                    if ball.check_ball_score(self.team, self.court_id, self.court_width, self.court_height, self.gate_width) == False:
-                        # print("shoot not score.")
-                        done = True
+                        if ball.check_ball_score(self.team, self.court_id, self.court_width, self.court_height, self.gate_width) == False:
+                            # print("shoot not score.")
+                            done = True
+
             if action == 5 or action == 6:
                 virtual_agent_pos = self.pos
             # print("virtual ball pos: ", virtual_ball_pos)
@@ -236,14 +263,20 @@ class Players:
         return virtual_agent_pos, virtual_ball_pos, shoot_blocked, pass_blocked, done
 
     def after_step(self, action, _map, ball, agents):
+        block = False
         winner = None
-        self.log = False
+        self.log = True
         stand_still_penalty = 0.0
-        attack_reward, defend_reward, block_reward = 0.0, 0.0, 0.0
+        attack_reward, defend_reward = 0.0, 0.0
+        if self.team == 'attack':
+            self.block_reward = 0.0
+        
         reward_info = dict()
         # print("simulate in after step: ")
         virtual_agent_pos, virtual_ball_pos, shoot_blocked, pass_blocked, done = self.simulate_move(action, _map, ball, agents)
-        self.log = True
+        if shoot_blocked or pass_blocked:
+            block = True
+        # self.log = True
         # check action = 0, we don't want the agent always stand still
         self.actions.append(action)
         action_records = {}
@@ -272,31 +305,29 @@ class Players:
 
         if self.team == "defend":
             if self.pos[0] - ball.pos[0] < 0 and action == 2:
-                defend_reward += 1.0
+                defend_reward += 2.0
             if  self.pos[0] - ball.pos[0] < 0 and action == 1:
                 defend_reward += -1.0
             if self.pos[0] - ball.pos[0] > 0 and action == 1:
-                defend_reward = 1.0
+                defend_reward += 2.0
             if self.pos[0] - ball.pos[0] > 0 and action == 2:
                 defend_reward += -1.0
             if self.pos[0] - ball.pos[0] == 0 and (action == 1 or action ==2):
                 defend_reward += -1.0
             if self.pos[0] - ball.pos[0] == 0 and (action != 1 and action != 2):
-                defend_reward += 1.0
+                defend_reward += 2.0
 
             if self.pos[1] - ball.pos[1] < 0 and action == 4:
                 defend_reward += 1.0
+            if self.pos[1] - ball.pos[1] < 0:
+                defend_reward -= 1.0
             if self.pos[1] - ball.pos[1] > 0 and action == 3:
-                defend_reward += 1.0
+                defend_reward -= 1.0
 
-            if pass_blocked or shoot_blocked:
-                block_reward = 20.0
-                winner = "defend"
+        reward = attack_reward + defend_reward + stand_still_penalty
 
-        reward = attack_reward + defend_reward + block_reward + stand_still_penalty
         reward_info["attack"] = attack_reward
         reward_info["defend"] = defend_reward
-        reward_info["block"] = block_reward
         reward_info["stand_still_penalty"] = stand_still_penalty
         
-        return reward, reward_info, winner, virtual_agent_pos, virtual_ball_pos, done
+        return reward, reward_info, winner, virtual_agent_pos, virtual_ball_pos, done, block

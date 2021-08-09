@@ -49,6 +49,31 @@ class Ball:
         
         return pos
 
+    def move2(self, source, destination, agents):
+        # print("source: ", source)
+        # print("destination: ", destination)
+        self.blocked = False
+        if destination[1] != source[1]:
+            k = (destination[0] - source[0]) / (destination[1] - source[1])
+        else:
+            k = 0
+        b = source[0] - k * source[1]
+        f = lambda x: k * x + b
+        
+        for agent in agents.values():
+            if agent.team == 'defend':
+                defend_x = agent.pos[1]
+                defend_y_min = agent.pos[0] - 1
+                defend_y_max = agent.pos[0] + 1
+                y = f(defend_x)
+                if y >= defend_y_min and y <= defend_y_max:
+                    self.blocked = True
+                    pos = [int(y), defend_x]
+        if not self.blocked:
+            pos = destination
+
+        return pos
+
     # if players only pass ball to other players instead of passing randomly, check_ball_pass_court is useless.
     def check_ball_pass_court(self, _map):
         if self.pos[0] < 0 or self.pos[0] >= _map.shape[0] or self.pos[1] < 0 or self.pos[1] >= _map.shape[1]:

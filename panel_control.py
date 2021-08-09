@@ -48,13 +48,13 @@ class Panel_Control:
         all_state = self.env.reset()
         if self.train_team:
             state = handle_obs(all_state, self.train_team)
+            input_shape = len(state)
 
         if self.train_team == "attack":
             output_shape = self.env.attack_action_space_n
         if self.train_team == "defend":
             output_shape = self.env.defend_action_space_n
-
-        input_shape = len(state)
+            
 
         if self.use_trained_defend_net:
             output_shape = self.env.defend_action_space_n

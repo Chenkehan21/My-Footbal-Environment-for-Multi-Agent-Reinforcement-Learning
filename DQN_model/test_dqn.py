@@ -8,7 +8,7 @@ import numpy as np
 from utils import *
 from DQN_model import DQN
 
-PATH = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_model/res_win_rate/football_0.880_66.500.dat'
+PATH = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_model/res_attack5/football_0.710_59.780.dat'
 
 
 def test(env, train_team, device):
@@ -79,4 +79,4 @@ if __name__ == "__main__":
     court_width=23, court_height=20, gate_width=6)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    test(env, 'defend', device)
+    test(env, 'attack', device)

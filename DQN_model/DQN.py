@@ -33,8 +33,8 @@ EPSILON_DECAY_LAST_FRAMES = 10000 # during the first 150,000 frames, epsilon is 
 EPSILON_START = 1.0
 EPSILON_END = 0.01
 
-SAVE_PATH_ATTACK = './DQN_model/res_attack4'
-SAVE_PATH_DEFEND = './DQN_model/res_defend2'
+SAVE_PATH_ATTACK = './DQN_model/res_attack5'
+SAVE_PATH_DEFEND = './DQN_model/res_defend4'
 
 
 Experience = collections.namedtuple("Experience", field_names=["state", "action", "reward", "done", "next_state"])
@@ -106,7 +106,8 @@ class Agent:
                 # print("AI action: ", AI_action)
             
             if self.train_team == 'defend' and trained_attack_net:
-                AI_q_values = trained_attack_net(state_v)
+                # print(AI_state_v)
+                AI_q_values = trained_attack_net(AI_state_v)
                 _, AI_action = torch.max(AI_q_values, dim=0)
                 AI_action = int(AI_action.item())
 
@@ -122,13 +123,13 @@ class Agent:
                     actions.append(action.action)
         
         # step action
-        print("actions: ", actions)
+        # print("actions: ", actions)
         next_state, rewards, done, info = self.env.step(actions)
-        next_state = handle_obs(next_state, self.train_team)
         for rew in rewards:
             if rew.team == self.train_team:
                 reward = rew.reward
-        exp = Experience(state=self.state, action=trainer_action, reward=reward, done=done, next_state=next_state)
+        trainer_next_state = handle_obs(next_state, self.train_team)
+        exp = Experience(state=self.state, action=trainer_action, reward=reward, done=done, next_state=trainer_next_state)
         self.exp_buffer.append(exp)
         self.total_rewards += reward
         if done:
@@ -137,7 +138,11 @@ class Agent:
                 win_times += 1
             done_reward = self.total_rewards
             self._reset()
-        self.state = next_state
+        self.state = trainer_next_state
+        if self.train_team == 'attack':
+            self.AI_state = handle_obs(next_state, 'defend')
+        if self.train_team == 'defend':
+            self.AI_state = handle_obs(next_state, 'attack')
 
         return done_reward, win_times
 
@@ -274,7 +279,7 @@ def main(save_path, train_team, use_trained_defend_net=False, use_trained_attack
 
     if use_trained_attack_net:
         output_shape = agent.env.attack_action_space_n
-        attacker_net_path = None
+        attacker_net_path = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_model/res_attack5/football_0.710_59.780.dat'
         trained_attack_net = DQN(input_shape, output_shape).to(device)
         trained_attack_net.eval()
         if attacker_net_path:
@@ -291,5 +296,5 @@ def main(save_path, train_team, use_trained_defend_net=False, use_trained_attack
         device, save_path, trained_defend_net=trained_defend_net, trained_attack_net=None)
 
 if __name__ == "__main__":
-    main(save_path=SAVE_PATH_ATTACK, train_team='attack',
-         use_trained_attack_net=False, use_trained_defend_net=True)
+    main(save_path=SAVE_PATH_DEFEND, train_team='defend',
+         use_trained_attack_net=True, use_trained_defend_net=False)

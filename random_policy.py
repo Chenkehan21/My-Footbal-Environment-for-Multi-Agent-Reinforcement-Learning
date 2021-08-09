@@ -1,4 +1,5 @@
 from football_env import Football_Env
+import time
 
 env = Football_Env(agents_left=[1], agents_right=[2],
     max_episode_steps=50000, move_reward_weight=1.0,
@@ -47,5 +48,6 @@ while True:
     print("attack win rate: ", attack_win_rate)
     print("defend win rate: ", defend_win_rate)
     n += 1
+    time.sleep(3)
     # if mean_defend_reward > 26:
     #     break
