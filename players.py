@@ -59,9 +59,30 @@ class Players:
 
     def sample_action(self):
         if self.team == "attack":
-            action = random.choice(list(range(7)))
+            actions = list(range(7))
+            if self.pos[0] == 0:
+                actions.remove(1)
+            if self.pos[0] == self.court_height - 1:
+                actions.remove(2)
+            if self.pos[1] == 0:
+                actions.remove(3)
+            if self.pos[1] == self.court_width - 1:
+                actions.remove(4)
+            action = random.choice(actions)
+
         if self.team == "defend":
-            action = random.choice(list(range(5)))
+            actions = list(range(5))
+            if self.pos[0] == 0:
+                actions.remove(1)
+            if self.pos[0] == self.court_height - 1:
+                actions.remove(2)
+            if self.pos[1] == 0:
+                actions.remove(3)
+            if self.pos[1] == self.court_width - 1:
+                actions.remove(4)
+            # print("proper actions: ", actions)
+            action = random.choice(actions)
+            # print("choose action: ", action)
         
         return action
 
@@ -307,22 +328,22 @@ class Players:
             if self.pos[0] - ball.pos[0] < 0 and action == 2:
                 defend_reward += 2.0
             if  self.pos[0] - ball.pos[0] < 0 and action == 1:
-                defend_reward += -1.0
+                defend_reward += -2.0
             if self.pos[0] - ball.pos[0] > 0 and action == 1:
                 defend_reward += 2.0
             if self.pos[0] - ball.pos[0] > 0 and action == 2:
-                defend_reward += -1.0
+                defend_reward += -2.0
             if self.pos[0] - ball.pos[0] == 0 and (action == 1 or action ==2):
-                defend_reward += -1.0
+                defend_reward += -2.0
             if self.pos[0] - ball.pos[0] == 0 and (action != 1 and action != 2):
                 defend_reward += 2.0
 
-            if self.pos[1] - ball.pos[1] < 0 and action == 4:
-                defend_reward += 1.0
-            if self.pos[1] - ball.pos[1] < 0:
-                defend_reward -= 1.0
-            if self.pos[1] - ball.pos[1] > 0 and action == 3:
-                defend_reward -= 1.0
+            # if self.pos[1] - ball.pos[1] < 0 and action == 4:
+            #     defend_reward += 1.0
+            # if self.pos[1] - ball.pos[1] < 0:
+            #     defend_reward -= 1.0
+            # if self.pos[1] - ball.pos[1] > 0 and action == 3:
+            #     defend_reward -= 1.0
 
         reward = attack_reward + defend_reward + stand_still_penalty
 

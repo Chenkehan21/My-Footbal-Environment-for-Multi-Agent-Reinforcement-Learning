@@ -258,6 +258,9 @@ class Football_Env:
             move_details["action"] = actions[i - 1]
             move_details["last_position"] = self.agents[i].pos
 
+            # if self.agents[i].team == 'defend':
+            #     print("agent pos: ", self.agents[i].pos, " action: ", actions[i - 1])
+
             move_reward, rew_info, move_done = self.get_move_rewards(self.agents[i], actions[i - 1])
 
             if self.agents[i].team == 'defend':

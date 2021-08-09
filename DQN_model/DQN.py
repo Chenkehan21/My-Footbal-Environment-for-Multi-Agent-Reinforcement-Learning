@@ -1,6 +1,7 @@
 import torch
 from torch._C import dtype
 import torch.nn as nn
+from torch.nn.modules import loss
 import torch.optim as optim
 
 import numpy as np
@@ -23,7 +24,7 @@ DEFAULT_ENV_NAME = "football"
 MEAN_REWARD_BOUND = 50 # pong game end when an agent gets 21 points
 
 GAMMA = 0.99 # used for Bellman approximation
-BATCH_SIZE = 32 # the size sampled from replay buffer
+BATCH_SIZE = 256 # the size sampled from replay buffer
 REPLAY_SIZE = 10000 # the maximum capicity of replay buffer
 REPLAY_START_SIZE = 10000 # the counts of frames we wait before start training
 LEARNING_RATE = 1e-4 # learning rate used in Adam optimizer
@@ -76,8 +77,40 @@ class Agent:
             self.AI_state = handle_obs(state, 'attack')
         self.total_rewards = 0.0
 
+    def check_action(self, action):
+        for agent in self.env.agents.values():
+            if self.train_team == "attack" and agent.team == self.train_team:
+                actions = list(range(7))
+                if agent.pos[0] == 0:
+                    actions.remove(1)
+                if agent.pos[0] == self.env.court_height - 1:
+                    actions.remove(2)
+                if agent.pos[1] == 0:
+                    actions.remove(3)
+                if agent.pos[1] == self.env.court_width - 1:
+                    actions.remove(4)
+                
+                if action in actions:
+                    return True
+
+            if self.train_team == "defend" and agent.team == self.train_team:
+                actions = list(range(5))
+                if agent.pos[0] == 0:
+                    actions.remove(1)
+                if agent.pos[0] == self.env.court_height - 1:
+                    actions.remove(2)
+                if agent.pos[1] == 0:
+                    actions.remove(3)
+                if agent.pos[1] == self.env.court_width - 1:
+                    actions.remove(4)
+                
+                if action in actions:
+                    return True
+        return False
+
     @torch.no_grad()
     def play_one_step(self, net, epsilon, device, trained_defend_net, trained_attack_net):
+        # print("epsilon: ", epsilon)
         done_reward = None
         win_times = 0
         # choose action using epsilon greedy policy
@@ -88,6 +121,7 @@ class Agent:
                 if action.team == self.train_team:
                     trainer_action = action.action
                 actions.append(action.action)
+            # print("actions here: ", actions)
         else:
             state_a = np.array(self.state, copy=False) # add an dimension for BATCH_SIZE!
             state_v = torch.tensor(state_a, dtype=torch.float).to(device)
@@ -96,21 +130,28 @@ class Agent:
 
             # print(state_v, '  ', state_v.shape)
             q_values = net(state_v) # since we put in state_v, batch_size=1 so q_values's size is [1, action_space.n]
-            _, action_v = torch.max(q_values, dim=0)
-            trainer_action = int(action_v.item())
-            AI_action = None
+            if len(q_values) > 0:
+                sorted_q_values, index = q_values.sort(descending=True)
+                trainer_actions = index.tolist()
+                while self.check_action(trainer_actions[0]) == False:
+                    trainer_actions.pop(0)
+                trainer_action = trainer_actions[0]
+
+            AI_action, AI_q_values = None, []
             if self.train_team == 'attack' and trained_defend_net:
                 AI_q_values = trained_defend_net(AI_state_v)
-                _, AI_action = torch.max(AI_q_values, dim=0)
-                AI_action = int(AI_action.item())
-                # print("AI action: ", AI_action)
             
             if self.train_team == 'defend' and trained_attack_net:
-                # print(AI_state_v)
                 AI_q_values = trained_attack_net(AI_state_v)
-                _, AI_action = torch.max(AI_q_values, dim=0)
-                AI_action = int(AI_action.item())
 
+            if len(AI_q_values) > 0:
+                sorted_q_values, index = AI_q_values.sort(descending=True)
+                AI_actions = index.tolist()
+                while self.check_action(AI_actions[0]) == False:
+                    # print("AI actions: ", AI_actions)
+                    AI_actions.pop(0)
+                AI_action = AI_actions[0]
+            # print("AI action: ", AI_action, "trainer action: ", trainer_action)
             total_actions = self.env.sample_actions()
             actions = []
             for action in total_actions:
@@ -121,6 +162,7 @@ class Agent:
                     actions.append(AI_action)
                 else:
                     actions.append(action.action)
+            # print("actions here2: ", actions)
         
         # step action
         # print("actions: ", actions)
@@ -147,7 +189,7 @@ class Agent:
         return done_reward, win_times
 
 
-def calc_loss(batch, net, target_net, device="cpu"):
+def calc_loss(loss_function, batch, net, target_net, device="cpu"):
     states, actions, rewards, dones, next_states = batch
     states_v = torch.tensor(np.array(states, copy=False), dtype=torch.float).to(device) # copy=False means if states changes states_v will change too
     actions_v = torch.tensor(np.array(actions, copy=False), dtype=torch.int64).to(device) # use copy can save memory
@@ -167,10 +209,10 @@ def calc_loss(batch, net, target_net, device="cpu"):
 
     expected_value = rewards_v + GAMMA * max_next_q_values
     # print(q_values, expected_value)
-    return nn.MSELoss()(q_values, expected_value)
+    return loss_function(q_values, expected_value)
 
 
-def train(net, target_net, buffer, agent, optimizer, 
+def train(net, target_net, buffer, agent, optimizer, loss_function, 
          device, save_path, trained_defend_net=None, trained_attack_net=None):
     print("start training")
     writer = SummaryWriter(comment='-'+DEFAULT_ENV_NAME)
@@ -223,7 +265,7 @@ def train(net, target_net, buffer, agent, optimizer,
             #     print("solved in %d frames" % frame_idx)
             #     break
 
-        if len(buffer) < REPLAY_START_SIZE:
+        if len(buffer) < BATCH_SIZE:
             continue
         
         # Don't forget sync target net otherwise it won't converge!
@@ -232,10 +274,13 @@ def train(net, target_net, buffer, agent, optimizer,
 
         optimizer.zero_grad()
         batch = buffer.sample()
-        loss = calc_loss(batch, net, target_net, device)
+        loss = calc_loss(loss_function, batch, net, target_net, device)
+        writer.add_scalar("dqn_"+DEFAULT_ENV_NAME+"_train_loss", loss, frame_idx)
+        # print(loss)
         loss.backward()
         optimizer.step()
-    writer.close()
+    
+        # writer.close()
         
 
 def main(save_path, train_team, use_trained_defend_net=False, use_trained_attack_net=False):
@@ -264,6 +309,7 @@ def main(save_path, train_team, use_trained_defend_net=False, use_trained_attack
     output_shape = action_space 
     net = DQN(input_shape, output_shape).to(device)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE) # only need one optimizer
+    loss_function = nn.MSELoss()
     
     target_net = DQN(input_shape, output_shape).to(device)
     print(net)
@@ -286,13 +332,13 @@ def main(save_path, train_team, use_trained_defend_net=False, use_trained_attack
             trained_attack_net.load_state_dict(torch.load(attacker_net_path))
 
     if not use_trained_attack_net and not use_trained_defend_net:
-        train(net, target_net, buffer, agent, optimizer, 
+        train(net, target_net, buffer, agent, optimizer, loss_function,
         device, save_path, trained_defend_net=None, trained_attack_net=None)
     if use_trained_attack_net:
-        train(net, target_net, buffer, agent, optimizer, 
+        train(net, target_net, buffer, agent, optimizer, loss_function,
         device, save_path, trained_defend_net=None, trained_attack_net=trained_attack_net)
     if use_trained_defend_net:
-        train(net, target_net, buffer, agent, optimizer, 
+        train(net, target_net, buffer, agent, optimizer, loss_function,
         device, save_path, trained_defend_net=trained_defend_net, trained_attack_net=None)
 
 if __name__ == "__main__":
