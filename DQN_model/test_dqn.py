@@ -66,6 +66,7 @@ def test(env, train_team, device,
 
     total_win_times = 0
     total_reward = 0.0
+    total_steps = 0
 
     all_state = env.reset()
     if train_team:
@@ -217,6 +218,7 @@ def test(env, train_team, device,
             
             # print("actions: ", actions)
             next_state, rewards, done, info = env.step(actions)
+            total_steps += 1
 
             for rew in rewards:
                 if rew.team == train_team:
@@ -232,7 +234,8 @@ def test(env, train_team, device,
 
     mean_reward = total_reward / 100
     win_rate = total_win_times / 100
-    print("mean reward: %.3f" % mean_reward, " | win rate: ", win_rate)
+    mean_steps = total_steps / 100
+    print("mean reward: %.3f" % mean_reward, " | win rate: ", win_rate, " | mean steps: ", mean_steps)
 
 
 if __name__ == "__main__":
