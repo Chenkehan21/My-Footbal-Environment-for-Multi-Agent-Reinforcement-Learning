@@ -5,6 +5,7 @@ from torch.nn.modules import loss
 import torch.optim as optim
 
 import numpy as np
+import random
 import collections
 import argparse
 import time
@@ -30,7 +31,7 @@ REPLAY_START_SIZE = 10000 # the counts of frames we wait before start training
 LEARNING_RATE = 1e-4 # learning rate used in Adam optimizer
 SYNC_TARGET_NET = 1000 # how frequently we sync target net
 
-EPSILON_DECAY_LAST_FRAMES = 10000 # during the first 150,000 frames, epsilon is linearly decayed to 0.01
+EPSILON_DECAY_LAST_FRAMES = 40000 # during the first 150,000 frames, epsilon is linearly decayed to 0.01
 EPSILON_START = 1.0
 EPSILON_END = 0.01
 
@@ -66,6 +67,10 @@ class Agent:
         self.env = env
         self.exp_buffer = exp_buffer
         self.train_team = train_team
+        if train_team == 'attack':
+            self.AI_team = 'defend'
+        else:
+            self.AI_team = 'attack'
         self._reset()
 
     def _reset(self):
@@ -77,9 +82,9 @@ class Agent:
             self.AI_state = handle_obs(state, 'attack')
         self.total_rewards = 0.0
 
-    def check_action(self, action):
+    def check_action(self, action, team):
         for agent in self.env.agents.values():
-            if self.train_team == "attack" and agent.team == self.train_team:
+            if team == "attack" and agent.team == team:
                 actions = list(range(7))
                 if agent.pos[0] == 0:
                     actions.remove(1)
@@ -89,11 +94,19 @@ class Agent:
                     actions.remove(3)
                 if agent.pos[1] == self.env.court_width - 1:
                     actions.remove(4)
+
+                shoot_pos = agent.can_shoot()
+                if shoot_pos:
+                    shoot_success_rate = agent.success_rate[shoot_pos[0]]
+                    if (agent.posses_ball and shoot_pos and random.random() < shoot_success_rate) != True:
+                        actions.remove(6)
+                else:
+                    actions.remove(6)
                 
                 if action in actions:
                     return True
 
-            if self.train_team == "defend" and agent.team == self.train_team:
+            if team == "defend" and agent.team == team:
                 actions = list(range(5))
                 if agent.pos[0] == 0:
                     actions.remove(1)
@@ -133,7 +146,7 @@ class Agent:
             if len(q_values) > 0:
                 sorted_q_values, index = q_values.sort(descending=True)
                 trainer_actions = index.tolist()
-                while self.check_action(trainer_actions[0]) == False:
+                while self.check_action(trainer_actions[0], self.train_team) == False:
                     trainer_actions.pop(0)
                 trainer_action = trainer_actions[0]
 
@@ -147,7 +160,7 @@ class Agent:
             if len(AI_q_values) > 0:
                 sorted_q_values, index = AI_q_values.sort(descending=True)
                 AI_actions = index.tolist()
-                while self.check_action(AI_actions[0]) == False:
+                while self.check_action(AI_actions[0], self.AI_team) == False:
                     # print("AI actions: ", AI_actions)
                     AI_actions.pop(0)
                 AI_action = AI_actions[0]
@@ -175,7 +188,7 @@ class Agent:
         self.exp_buffer.append(exp)
         self.total_rewards += reward
         if done:
-            # print("winner: ", info['winner'])
+            print("winner: ", info['winner'])
             if info['winner'] == self.train_team:
                 win_times += 1
             done_reward = self.total_rewards
@@ -235,12 +248,13 @@ def train(net, target_net, buffer, agent, optimizer, loss_function,
             speed = (frame_idx - ts_frame) / (time.time() - ts)
             ts_frame = frame_idx
             ts = time.time()
-            mean_reward = np.mean(total_rewards[-100:])
+            mean_reward = np.mean(total_rewards[-1:])
             win_rate = np.mean(total_win_times[-100:])
             # print("total_reward: ", total_rewards)
 
-            print("frame: %d| %d games done| mean_reward100: %.3f| win_rate: %.3f| eps: %.3f| speed: %.3f f/s" %\
+            print("total steps: %d| %d games done| mean_reward100: %.3f| win_rate: %.3f| eps: %.3f| speed: %.3f f/s" %\
                 (frame_idx, len(total_rewards), mean_reward, win_rate, epsilon, speed))
+            time.sleep(2)
 
             if len(total_rewards) > 100:
                 writer.add_scalar("dqn_"+DEFAULT_ENV_NAME+"_mean_reward", mean_reward, len(total_rewards))

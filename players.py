@@ -37,7 +37,7 @@ class Players:
         self.gate_pos = self.get_gate_pos()
         self.success_rate = self.get_success_rate()
         self.posses_ball = False
-        self.log = True
+        self.log = False
         self.miss_prob = 0.4
 
     def _get_obs(self, _map):
@@ -68,6 +68,15 @@ class Players:
                 actions.remove(3)
             if self.pos[1] == self.court_width - 1:
                 actions.remove(4)
+
+            shoot_pos = self.can_shoot()
+            if shoot_pos:
+                shoot_success_rate = self.success_rate[shoot_pos[0]]
+                if (self.posses_ball and random.random() < shoot_success_rate) != True:
+                    actions.remove(6)
+            else:
+                actions.remove(6)
+            
             action = random.choice(actions)
 
         if self.team == "defend":
@@ -270,9 +279,7 @@ class Players:
                         virtual_ball_pos = ball.move2(self.pos, shoot_pos, agents)
                         if ball.blocked:
                             shoot_blocked = True
-                        if ball.check_ball_score(self.team, self.court_id, self.court_width, self.court_height, self.gate_width) == False:
-                            # print("shoot not score.")
-                            done = True
+                        done = True
 
             if action == 5 or action == 6:
                 virtual_agent_pos = self.pos
@@ -286,7 +293,7 @@ class Players:
     def after_step(self, action, _map, ball, agents):
         block = False
         winner = None
-        self.log = True
+        # self.log = True
         stand_still_penalty = 0.0
         attack_reward, defend_reward = 0.0, 0.0
         if self.team == 'attack':
@@ -338,10 +345,10 @@ class Players:
             if self.pos[0] - ball.pos[0] == 0 and (action != 1 and action != 2):
                 defend_reward += 2.0
 
-            # if self.pos[1] - ball.pos[1] < 0 and action == 4:
-            #     defend_reward += 1.0
-            # if self.pos[1] - ball.pos[1] < 0:
-            #     defend_reward -= 1.0
+            if self.pos[1] - ball.pos[1] < 0 and action == 4:
+                defend_reward += 1.0
+            if self.pos[1] - ball.pos[1] < 0 and action == 3:
+                defend_reward -= 1.0
             # if self.pos[1] - ball.pos[1] > 0 and action == 3:
             #     defend_reward -= 1.0
 

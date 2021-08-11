@@ -1,6 +1,6 @@
 import os
 import sys
-
+import random
 from torch._C import dtype
 sys.path.append(os.path.dirname(__file__) + os.sep + '../')
 
@@ -16,13 +16,56 @@ class Panel_Control:
                  attack_net_path=None, defend_net_path=None):
         self.env = env
         self.window = mywindow
-        self.train_team = train_team
+        self.train_team = train_team    
+        if self.train_team == 'attack':
+            self.AI_team = 'defend'
+        else:
+            self.AI_team = 'attack'
         self.device = device
         self.use_trained_attack_net = use_trained_attack_net
         self.use_trained_defend_net = use_trained_defend_net
         self.attack_net_path = attack_net_path
         self.defend_net_path = defend_net_path
         self.actionResponse()
+
+    def check_action(self, action, team):
+        for agent in self.env.agents.values():
+            if team == "attack" and agent.team == team:
+                actions = list(range(7))
+                if agent.pos[0] == 0:
+                    actions.remove(1)
+                if agent.pos[0] == self.env.court_height - 1:
+                    actions.remove(2)
+                if agent.pos[1] == 0:
+                    actions.remove(3)
+                if agent.pos[1] == self.env.court_width - 1:
+                    actions.remove(4)
+
+                shoot_pos = agent.can_shoot()
+                if shoot_pos:
+                    shoot_success_rate = agent.success_rate[shoot_pos[0]]
+                    if (agent.posses_ball and shoot_pos and random.random() < shoot_success_rate) != True:
+                        actions.remove(6)
+                else:
+                    actions.remove(6)
+                
+                if action in actions:
+                    return True
+
+            if team == "defend" and agent.team == team:
+                actions = list(range(5))
+                if agent.pos[0] == 0:
+                    actions.remove(1)
+                if agent.pos[0] == self.env.court_height - 1:
+                    actions.remove(2)
+                if agent.pos[1] == 0:
+                    actions.remove(3)
+                if agent.pos[1] == self.env.court_width - 1:
+                    actions.remove(4)
+                
+                if action in actions:
+                    return True
+        return False
 
     def doReset(self):
         print("Reset Button")
@@ -97,8 +140,14 @@ class Panel_Control:
             if self.train_team == 'attack':
                 if self.use_trained_attack_net:
                     trainer_q_values = trained_attack_net(state_v)
-                    _, action_v = torch.max(trainer_q_values, dim=0)
-                    trainer_action = int(action_v.item())
+                    sorted_q_values, index = trainer_q_values.sort(descending=True)
+                    trainer_actions = index.tolist()
+                    while self.check_action(trainer_actions[0], self.train_team) == False:
+                        trainer_actions.pop(0)
+                    trainer_action = trainer_actions[0]
+
+                    # _, action_v = torch.max(trainer_q_values, dim=0)
+                    # trainer_action = int(action_v.item())
                 else:
                     for action in all_actions:
                         if action.team == 'attack':
@@ -108,6 +157,12 @@ class Panel_Control:
                     AI_q_values = trained_defend_net(AI_state_v)
                     _, AI_action_v = torch.max(AI_q_values, dim=0)
                     AI_action = int(AI_action_v.item())
+                    sorted_q_values, index = AI_q_values.sort(descending=True)
+                    AI_actions = index.tolist()
+                    while self.check_action(AI_actions[0], self.AI_team) == False:
+                        # print("AI actions: ", AI_actions)
+                        AI_actions.pop(0)
+                    AI_action = AI_actions[0]
                 else:
                     for action in all_actions:
                         if action.team == 'defend':
