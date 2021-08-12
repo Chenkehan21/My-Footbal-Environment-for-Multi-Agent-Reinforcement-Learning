@@ -22,8 +22,14 @@ EXPERIENCE_SIZE = 10000
 
 
 class Experience(Agents):
-    def __init__(self, experience_size):
-        super(Experience, self).__init__()
+    def __init__(self, env, train_team, device, 
+         use_trained_defend_net, use_trained_attack_net,
+         defender_net_path, attacker_net_path, experience_size):
+        super(Experience, self).__init__(
+            env, train_team, device, 
+            use_trained_defend_net, use_trained_attack_net,
+            defender_net_path, attacker_net_path)
+            
         self.experience_size = experience_size
 
     def generate_experience(self, all_state, trained_defend_net, trained_attack_net):
