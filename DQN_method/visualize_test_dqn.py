@@ -21,6 +21,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     defend_net_path = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_defend4/football_0.860_98.000.dat'
     attack_net_path = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_attack5/football_0.710_59.780.dat'
+    # attack_net_path = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_attack6/football_0.920_137.000.dat'
     window = mywindow(2, env)
     control = Panel_Control(env, train_team='attack', device=device,
                             use_trained_defend_net=True, use_trained_attack_net=True,

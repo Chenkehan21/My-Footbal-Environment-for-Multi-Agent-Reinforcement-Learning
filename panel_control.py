@@ -48,7 +48,8 @@ class Panel_Control(Agents):
         all_state = self.env.reset()
 
         while not self.env.Done:
-            actions, _, _, _, _, _ = self.get_actions(all_state, self.trained_defend_net, self.trained_attack_net)
+            actions, _, _, _, _, _, _ = self.get_actions(all_state, self.trained_defend_net, self.trained_attack_net)
+            # print("actions: ", actions)
             next_state, rewards, done, info = self.env.step(actions)
 
             if done:

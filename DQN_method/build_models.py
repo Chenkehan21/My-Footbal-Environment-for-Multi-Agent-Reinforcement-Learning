@@ -36,10 +36,12 @@ class Model(nn.Module):
                 random.choice(act_layer),
             )
             layer_list.append(hidden_layer)
-        last_layer = nn.Sequential(
+        linear_layer = nn.Sequential(
             nn.Linear(hidden_size, act_size),
             random.choice(act_layer),
         )
+        layer_list.append(linear_layer)
+        last_layer = nn.LogSoftmax(dim=1)
         layer_list.append(last_layer)
 
         return layer_list
@@ -56,15 +58,18 @@ def build_models(env, train_team='attack', model_num=MODEL_NUM):
     if train_team == "defend":
         output_shape = env.defend_action_space_n
 
-    state = env.reset()
-    state = handle_obs(state, train_team)  
+    # env.reset()
+    # state = env._map
+    # input_shape = state.size
 
+    state = env.reset()
+    state = handle_obs(state, 'attack')
     input_shape = len(state)
 
     models = []
     for _ in range(model_num):
-        linear_num = random.randrange(1, 15)
-        hidden_size = random.randrange(16, 256)
+        linear_num = random.randrange(1, 10)
+        hidden_size = random.randrange(16, 512)
         act_layer = [nn.ReLU(), nn.Tanh(), nn.Sigmoid(), nn.LeakyReLU(), nn.ReLU6(), nn.RReLU()]
         model = Model(linear_num, hidden_size, act_layer, input_shape, output_shape)
         models.append(model)

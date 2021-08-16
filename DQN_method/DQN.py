@@ -35,7 +35,7 @@ EPSILON_DECAY_LAST_FRAMES = 40000 # during the first 150,000 frames, epsilon is 
 EPSILON_START = 1.0
 EPSILON_END = 0.01
 
-SAVE_PATH_ATTACK = './DQN_method/res_attack5'
+SAVE_PATH_ATTACK = './DQN_method/res_attack6'
 SAVE_PATH_DEFEND = './DQN_method/res_defend4'
 
 
@@ -86,6 +86,7 @@ class Agent:
         for agent in self.env.agents.values():
             if team == "attack" and agent.team == team:
                 actions = list(range(7))
+                actions.remove(5)
                 if agent.pos[0] == 0:
                     actions.remove(1)
                 if agent.pos[0] == self.env.court_height - 1:
@@ -95,13 +96,13 @@ class Agent:
                 if agent.pos[1] == self.env.court_width - 1:
                     actions.remove(4)
 
-                shoot_pos = agent.can_shoot()
-                if shoot_pos:
-                    shoot_success_rate = agent.success_rate[shoot_pos[0]]
-                    if (agent.posses_ball and shoot_pos and random.random() < shoot_success_rate) != True:
-                        actions.remove(6)
-                else:
-                    actions.remove(6)
+                # shoot_pos = agent.can_shoot()
+                # if shoot_pos:
+                #     shoot_success_rate = agent.success_rate[shoot_pos[0]]
+                #     if (agent.posses_ball and shoot_pos and random.random() < shoot_success_rate) != True:
+                #         actions.remove(6)
+                # else:
+                #     actions.remove(6)
                 
                 if action in actions:
                     return True
@@ -248,13 +249,13 @@ def train(net, target_net, buffer, agent, optimizer, loss_function,
             speed = (frame_idx - ts_frame) / (time.time() - ts)
             ts_frame = frame_idx
             ts = time.time()
-            mean_reward = np.mean(total_rewards[-1:])
+            mean_reward = np.mean(total_rewards[-100:])
             win_rate = np.mean(total_win_times[-100:])
             # print("total_reward: ", total_rewards)
 
             print("total steps: %d| %d games done| mean_reward100: %.3f| win_rate: %.3f| eps: %.3f| speed: %.3f f/s" %\
                 (frame_idx, len(total_rewards), mean_reward, win_rate, epsilon, speed))
-            time.sleep(2)
+            # time.sleep(2)
 
             if len(total_rewards) > 100:
                 writer.add_scalar("dqn_"+DEFAULT_ENV_NAME+"_mean_reward", mean_reward, len(total_rewards))
@@ -330,7 +331,7 @@ def main(save_path, train_team, use_trained_defend_net=False, use_trained_attack
 
     if use_trained_defend_net:
         output_shape = agent.env.defend_action_space_n
-        defender_net_path = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_win_rate/football_0.880_66.500.dat'
+        defender_net_path = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_defend4/football_0.860_98.000.dat'
         trained_defend_net = DQN(input_shape, output_shape).to(device)
         trained_defend_net.eval()
         if defender_net_path:
@@ -356,5 +357,5 @@ def main(save_path, train_team, use_trained_defend_net=False, use_trained_attack
         device, save_path, trained_defend_net=trained_defend_net, trained_attack_net=None)
 
 if __name__ == "__main__":
-    main(save_path=SAVE_PATH_DEFEND, train_team='defend',
-         use_trained_attack_net=True, use_trained_defend_net=False)
+    main(save_path=SAVE_PATH_ATTACK, train_team='attack',
+         use_trained_attack_net=False, use_trained_defend_net=True)

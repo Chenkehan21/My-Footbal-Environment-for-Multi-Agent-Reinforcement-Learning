@@ -118,6 +118,7 @@ class Agents:
                 
         actions = []
         trainer_action, AI_action = None, None
+        trainer_actions, AI_actions = [], []
         all_actions = self.env.sample_actions()
         if self.train_team == 'attack':
             if self.use_trained_attack_net:
@@ -205,5 +206,7 @@ class Agents:
                 while self.check_action(action, action_team) == False:
                     action = random.choice(list(range(7)))
                 actions.append(action)
+        
+        map_state = self.env._map
 
-        return actions, trainer_actions, AI_actions, trainer_action, AI_action, state_v
+        return actions, trainer_actions, AI_actions, trainer_action, AI_action, state_v, map_state

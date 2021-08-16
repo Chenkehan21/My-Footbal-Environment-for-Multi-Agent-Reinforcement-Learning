@@ -29,20 +29,33 @@ class Experience(Agents):
             env, train_team, device, 
             use_trained_defend_net, use_trained_attack_net,
             defender_net_path, attacker_net_path)
-            
+
         self.experience_size = experience_size
+        self.trained_defend_net, self.trained_attack_net = self.get_nets()
 
-    def generate_experience(self, all_state, trained_defend_net, trained_attack_net):
+    def generate_experience(self):
         experience = []
-
-        while len(experience) < self.experience_size:
+        n, m, k = 0, 0, 0
+        while n <= 3000 or m <= 3000 or k <= 2000:
             all_state = self.env.reset()
             while True:
-                actions, _, _, _, AI_action, state_v = self.get_actions(all_state, trained_defend_net, trained_attack_net)
+                actions, _, _, _, AI_action, state_v, map_state = self.get_actions(all_state, self.trained_defend_net, self.trained_attack_net)
                 if self.train_team == 'attack':
-                    experience_state = torch.FloatTensor(np.array(state_v, dtype=np.float))
-                    experience_action = torch.FloatTensor(AI_action)
-                    experience.append((experience_state, experience_action))
+                    experience_state = state_v.to(self.device)
+                    # experience_state = torch.FloatTensor(map_state)
+                    # experience_state = experience_state.reshape(1, -1).squeeze()
+                    experience_action = torch.FloatTensor([AI_action]).to(self.device)
+                    if AI_action == 1:
+                        n += 1
+                        if n <= 3000:
+                            experience.append((experience_state, experience_action))
+                    elif AI_action == 2:
+                        m += 1
+                        if m <= 3000:
+                            experience.append((experience_state, experience_action))
+                    elif AI_action == 4:
+                        k += 1
+                        experience.append((experience_state, experience_action))
                 else:
                     print("train team is defend!")
                     exit()

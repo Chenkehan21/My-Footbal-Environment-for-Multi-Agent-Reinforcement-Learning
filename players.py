@@ -60,6 +60,7 @@ class Players:
     def sample_action(self):
         if self.team == "attack":
             actions = list(range(7))
+            actions.remove(5)
             if self.pos[0] == 0:
                 actions.remove(1)
             if self.pos[0] == self.court_height - 1:
@@ -69,13 +70,13 @@ class Players:
             if self.pos[1] == self.court_width - 1:
                 actions.remove(4)
 
-            shoot_pos = self.can_shoot()
-            if shoot_pos:
-                shoot_success_rate = self.success_rate[shoot_pos[0]]
-                if (self.posses_ball and random.random() < shoot_success_rate) != True:
-                    actions.remove(6)
-            else:
-                actions.remove(6)
+            # shoot_pos = self.can_shoot()
+            # if shoot_pos:
+            #     shoot_success_rate = self.success_rate[shoot_pos[0]]
+            #     if (self.posses_ball and random.random() < shoot_success_rate) != True:
+            #         actions.remove(6)
+            # else:
+            #     actions.remove(6)
             
             action = random.choice(actions)
 
@@ -275,11 +276,11 @@ class Players:
                     # shoot_pos = attack_pos
                     
                     shoot_success_rate = self.success_rate[shoot_pos[0]]
-                    if random.random() <= shoot_success_rate:
-                        virtual_ball_pos = ball.move2(self.pos, shoot_pos, agents)
-                        if ball.blocked:
-                            shoot_blocked = True
-                        done = True
+                    # if random.random() <= shoot_success_rate:
+                    virtual_ball_pos = ball.move2(self.pos, shoot_pos, agents)
+                    if ball.blocked:
+                        shoot_blocked = True
+                    done = True
 
             if action == 5 or action == 6:
                 virtual_agent_pos = self.pos
@@ -306,30 +307,34 @@ class Players:
             block = True
         # self.log = True
         # check action = 0, we don't want the agent always stand still
-        self.actions.append(action)
-        action_records = {}
-        for k, v, in itertools.groupby(self.actions):
-            action_records[k] = list(v)
-        if 0 in action_records.keys() and len(action_records[0]) >= 5:
-            # if not move more than 3 steps give a penalty
-            stand_still_penalty = -5.0
-            self.actions.clear()
-        if len(self.actions) > 1000:
-            self.actions.clear() # avoid memory leak
+        # if self.team == 'attack':
+        #     self.actions.append(action)
+        #     # print("self.actions: ", self.actions)
+        # if len(self.actions) and self.actions.count(0) / len(self.actions) >= 0.5:
+        #     stand_still_penalty = -50.0
+        #     print("++++++++++++++++++++++++get penalty+++++++++++++++++++++++++++")
+        # if len(self.actions) > 1000:
+        #     self.actions.clear() # avoid memory leak
         
         shoot_pos = self.can_shoot()
 
         if self.team == "attack":
             if self.court_id == "left" and action == 4:
-                attack_reward += 1.0
+                attack_reward += 2.0
             if self.court_id == "left" and action == 3:
-                attack_reward += -1.0
+                attack_reward += -2.0
             if self.court_id == "right" and action == 3:
-                attack_reward += 1.0
+                attack_reward += 2.0
             if self.court_id == "right" and action == 4:
-                attack_reward += -1.0
-            if action == 6 and shoot_pos != None:
-                attack_reward += 7.0
+                attack_reward += -2.0
+
+            if action in [0, 1, 2, 3, 4, 5]:
+                attack_reward -= 1.0
+
+            if shoot_pos != None and action != 6:
+                attack_reward -= 5.0
+            # if action == 6:
+            #     attack_reward += 1.0
 
         if self.team == "defend":
             if self.pos[0] - ball.pos[0] < 0 and action == 2:
