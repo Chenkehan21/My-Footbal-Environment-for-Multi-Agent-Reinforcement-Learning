@@ -6,7 +6,7 @@ import sys
 
 class UI_FORM:
     def setup_UI(self, Form):
-        Form.setObjectName("Form")
+        Form.setObjectName("Football")
         Form.resize(1000, 700)
         Form.setMinimumSize(QtCore.QSize(500, 550))
         Form.setMaximumSize(QtCore.QSize(500, 550))
@@ -69,7 +69,7 @@ class UI_FORM:
 
     def retranslate_UI(self, Form):
         _translate = QtCore.QCoreApplication.translate
-        Form.setWindowTitle(_translate("Form", "Form"))
+        Form.setWindowTitle(_translate("Form", "Football"))
         self.Football_court.setTitle(_translate("Form", "Football Court"))
 
         self.Button_Reset.setText(_translate("Form", "Reset"))

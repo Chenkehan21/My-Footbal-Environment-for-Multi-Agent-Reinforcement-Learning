@@ -243,7 +243,7 @@ class Football_Env:
             return True
         return False
 
-    def step(self, actions: tuple):
+    def step(self, actions):
         self.winner = []
         self.Done = False
         self.blocked = False
