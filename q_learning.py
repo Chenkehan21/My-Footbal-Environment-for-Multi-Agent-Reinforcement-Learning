@@ -61,15 +61,10 @@ class Agent:
     def update_q_value_table(self, s, a, r, s_next):
         old_q_value = self.q_value_table[(s.tobytes(), a[0])]
         new_q_value, _ = self.get_best_v_and_best_a(s_next)
-        # print("===a: ", a)
-        # print("old_q_value: ", old_q_value)
-        # print("new_q_value: ", new_q_value)
-        # print("r: ", r)
         for rew in r:
             if rew.team == self.train_team:
                 reward = rew.reward
         self.q_value_table[(s.tobytes(), a[0])] = (1 - ALPHA) * old_q_value + ALPHA * (reward + GAMMA * new_q_value)
-        # self.q_value_table[(s.tobytes(), a)] = 2
 
     def play_episode(self, env):
         print(self.state)
@@ -81,23 +76,18 @@ class Agent:
         while True:
             _, trainer_action = self.get_best_v_and_best_a(state)
             total_actions = self.env.sample_actions()
-            # print("trainer action: ", trainer_action)
-            # print("total actions: ", total_actions)
-            print("trainer action: ", trainer_action)
             actions = []
             for action in total_actions:
                 if action.team == self.train_team:
                     actions.append(trainer_action)
                 else:
                     actions.append(action.action)
-            # print("actions: ", actions)
             new_state, reward, done, info = env.step(actions)
             total_steps += 1
             for rew in reward:
                 if rew.team == self.train_team:
                     total_reward += rew.reward
             if done:
-                # print("====done====", "    winner: ", info['winner'], '\n')
                 if info['winner'] == self.train_team:
                     win_times += 1
                 state = env.reset()
@@ -116,13 +106,11 @@ def main():
     best_reward = -1e8
     agent = Agent()
     for _ in range(100):
-        # print(agent.q_value_table)
         iter_n += 1
         total_reward = 0.0
         total_win = 0
         total_steps = 0
         s, a, r, next_s = agent.sample_env()
-        # print("a: ", a)
         agent.update_q_value_table(s, a, r, next_s)
         for i in range(TEST_EPISODES):
             rew, win_n, steps = agent.play_episode(env)
@@ -132,17 +120,8 @@ def main():
         mean_win_rate = total_win / TEST_EPISODES
         mean_steps = total_steps / TEST_EPISODES
         mean_reward = total_reward / TEST_EPISODES
-        # if mean_reward > 0.8:
-        #     print("solved in %d iterations, final reward %.3f" % (iter_n, mean_reward))
-        #     break
-        # print("mean steps:", mean_steps, "    defend total reward:", total_reward, 
-        #      "    total win:", total_win, "    table size: ", len(agent.q_value_table))
         if mean_win_rate > best_win_rate:
-            # print("best win rate update: %.3f -> %.3f" % (best_win_rate, mean_win_rate))
             best_win_rate = mean_win_rate
-            # with open('./q_learning_res/q_learning_%.3f_%.3f.pkl' % (best_reward, best_win_rate), 'wb') as f:
-            #     pickle.dump(agent, f)
-            # time.sleep(1)
         if mean_reward > best_reward:
             print("n: ", iter_n, "best reward update: %.3f -> %.3f" % (best_reward, mean_reward), "defend win rate: ", best_win_rate)
             best_reward = mean_reward

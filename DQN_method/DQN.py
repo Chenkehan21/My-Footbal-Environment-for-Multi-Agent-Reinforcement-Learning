@@ -124,7 +124,6 @@ class Agent:
 
     @torch.no_grad()
     def play_one_step(self, net, epsilon, device, trained_defend_net, trained_attack_net):
-        # print("epsilon: ", epsilon)
         done_reward = None
         win_times = 0
         # choose action using epsilon greedy policy
@@ -135,14 +134,12 @@ class Agent:
                 if action.team == self.train_team:
                     trainer_action = action.action
                 actions.append(action.action)
-            # print("actions here: ", actions)
         else:
             state_a = np.array(self.state, copy=False) # add an dimension for BATCH_SIZE!
             state_v = torch.tensor(state_a, dtype=torch.float).to(device)
             AI_state_a = np.array(self.AI_state, copy=False)
             AI_state_v = torch.tensor(AI_state_a, dtype=torch.float).to(device)
 
-            # print(state_v, '  ', state_v.shape)
             q_values = net(state_v) # since we put in state_v, batch_size=1 so q_values's size is [1, action_space.n]
             if len(q_values) > 0:
                 sorted_q_values, index = q_values.sort(descending=True)
@@ -162,24 +159,19 @@ class Agent:
                 sorted_q_values, index = AI_q_values.sort(descending=True)
                 AI_actions = index.tolist()
                 while self.check_action(AI_actions[0], self.AI_team) == False:
-                    # print("AI actions: ", AI_actions)
                     AI_actions.pop(0)
                 AI_action = AI_actions[0]
-            # print("AI action: ", AI_action, "trainer action: ", trainer_action)
             total_actions = self.env.sample_actions()
             actions = []
             for action in total_actions:
                 if action.team == self.train_team:
                     actions.append(trainer_action)
                 elif AI_action:
-                    # print("AI action: ", AI_action)
                     actions.append(AI_action)
                 else:
                     actions.append(action.action)
-            # print("actions here2: ", actions)
         
         # step action
-        # print("actions: ", actions)
         next_state, rewards, done, info = self.env.step(actions)
         for rew in rewards:
             if rew.team == self.train_team:
@@ -211,7 +203,6 @@ def calc_loss(loss_function, batch, net, target_net, device="cpu"):
     done_mask = torch.BoolTensor(dones).to(device)
     next_states_v = torch.tensor(np.array(next_states, copy=False), dtype=torch.float).to(device)
 
-    # print("actions_v: ", actions_v)
     q_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
 
     with torch.no_grad():
@@ -222,7 +213,7 @@ def calc_loss(loss_function, batch, net, target_net, device="cpu"):
         max_next_q_values = max_next_q_values.detach()
 
     expected_value = rewards_v + GAMMA * max_next_q_values
-    # print(q_values, expected_value)
+
     return loss_function(q_values, expected_value)
 
 
@@ -245,13 +236,11 @@ def train(net, target_net, buffer, agent, optimizer, loss_function,
         if reward is not None:
             total_rewards.append(reward)
             total_win_times.append(win_times)
-            # print('total_win_times: ', total_win_times)
             speed = (frame_idx - ts_frame) / (time.time() - ts)
             ts_frame = frame_idx
             ts = time.time()
             mean_reward = np.mean(total_rewards[-100:])
             win_rate = np.mean(total_win_times[-100:])
-            # print("total_reward: ", total_rewards)
 
             print("total steps: %d| %d games done| mean_reward100: %.3f| win_rate: %.3f| eps: %.3f| speed: %.3f f/s" %\
                 (frame_idx, len(total_rewards), mean_reward, win_rate, epsilon, speed))
@@ -276,10 +265,6 @@ def train(net, target_net, buffer, agent, optimizer, loss_function,
                 print("keep best win rate: %.3f, best reward update: %.3f -> %.3f" % (best_win_rate, best_reward, mean_reward))
                 best_reward = mean_reward
 
-            # if mean_reward > MEAN_REWARD_BOUND:
-            #     print("solved in %d frames" % frame_idx)
-            #     break
-
         if len(buffer) < BATCH_SIZE:
             continue
         
@@ -291,7 +276,6 @@ def train(net, target_net, buffer, agent, optimizer, loss_function,
         batch = buffer.sample()
         loss = calc_loss(loss_function, batch, net, target_net, device)
         writer.add_scalar("dqn_"+DEFAULT_ENV_NAME+"_train_loss", loss, frame_idx)
-        # print(loss)
         loss.backward()
         optimizer.step()
     
@@ -336,7 +320,6 @@ def main(save_path, train_team, use_trained_defend_net=False, use_trained_attack
         trained_defend_net.eval()
         if defender_net_path:
             trained_defend_net.load_state_dict(torch.load(defender_net_path))
-            print(trained_defend_net)
 
     if use_trained_attack_net:
         output_shape = agent.env.attack_action_space_n

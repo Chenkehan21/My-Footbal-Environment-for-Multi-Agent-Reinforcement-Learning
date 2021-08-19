@@ -44,9 +44,6 @@ class Players:
         my_pos = self.pos
         around_obs, _ = self.see_around(_map)
         gate_pos = self.gate_pos
-        # print(my_pos)
-        # print(around_obs)
-        # print(gate_pos)
         gate_pos = np.squeeze(np.array(gate_pos).reshape(1, -1))
         obs = np.concatenate(
             [np.array(my_pos), 
@@ -57,10 +54,10 @@ class Players:
         
         return obs
 
-    def sample_action(self):
+    def sample_action(self, _map, agents):
         if self.team == "attack":
             actions = list(range(7))
-            actions.remove(5)
+            # actions.remove(5) # if use mutliagent action=5 is useful!
             if self.pos[0] == 0:
                 actions.remove(1)
             if self.pos[0] == self.court_height - 1:
@@ -70,13 +67,20 @@ class Players:
             if self.pos[1] == self.court_width - 1:
                 actions.remove(4)
 
-            # shoot_pos = self.can_shoot()
-            # if shoot_pos:
-            #     shoot_success_rate = self.success_rate[shoot_pos[0]]
-            #     if (self.posses_ball and random.random() < shoot_success_rate) != True:
-            #         actions.remove(6)
-            # else:
-            #     actions.remove(6)
+            pass_pos, pass_agent_id = self.can_pass(_map, agents)
+            if pass_pos == None:
+                actions.remove(5)
+            else:
+                if self.posses_ball == False:
+                    actions.remove(5)
+
+            shoot_pos = self.can_shoot()
+            if shoot_pos:
+                shoot_success_rate = self.success_rate[shoot_pos[0]]
+                if (self.posses_ball and random.random() < shoot_success_rate) != True:
+                    actions.remove(6)
+            else:
+                actions.remove(6)
             
             action = random.choice(actions)
 
@@ -90,9 +94,7 @@ class Players:
                 actions.remove(3)
             if self.pos[1] == self.court_width - 1:
                 actions.remove(4)
-            # print("proper actions: ", actions)
             action = random.choice(actions)
-            # print("choose action: ", action)
         
         return action
 
@@ -112,6 +114,26 @@ class Players:
                     agents_pos_around.append([i, j])
 
         while len(agents_around) != 9:
+            agents_around.append(0)
+
+        return agents_around, agents_pos_around
+
+    def see_around_extend(self, _map):
+        agents_around = []
+        agents_pos_around = []
+        court_width = _map.shape[1]
+        court_height = _map.shape[0]
+        row_start = self.pos[0] - 2 if self.pos[0] - 2 >= 0 else 0
+        row_end = self.pos[0] + 3 if self.pos[0] + 3 <= court_height else court_height
+        col_start = self.pos[1] - 2 if self.pos[1] - 2 >= 0 else 0
+        col_end = self.pos[1] + 3 if self.pos[1] + 3 <= court_width else court_width
+        for i in range(row_start, row_end):
+            for j in range(col_start, col_end):
+                agents_around.append(_map[i][j])
+                if _map[i][j] != 0 and _map[i][j] != self.id:
+                    agents_pos_around.append([i, j])
+
+        while len(agents_around) != 25:
             agents_around.append(0)
 
         return agents_around, agents_pos_around
@@ -190,10 +212,18 @@ class Players:
             return shoot_pos
         else:
             return None
-            
+
+    def can_pass(self, _map, agents):
+        pass_pos, pass_agent = None, 0
+        agents_around, _ = self.see_around_extend(_map)
+        for agent_id in agents_around:
+            if agent_id != 0 and agents[agent_id].team == 'attack' and agent_id != self.id:
+                pass_pos = agents[agent_id].pos
+                pass_agent = agent_id
+        
+        return pass_pos, pass_agent
     
     def simulate_move(self, action, _map, ball, agents):
-        # print("action in simulate: ", action)
         done = False
         pass_blocked, shoot_blocked = False, False
         virtual_ball_pos = ball.pos
@@ -202,79 +232,38 @@ class Players:
             virtual_agent_pos = self.pos
         if action == 1: # UP
             virtual_agent_pos = [self.pos[0] - 1, self.pos[1]]
-            # print("virtual_agent_pos: ", virtual_agent_pos)
             if self.posses_ball:
                 virtual_ball_pos = virtual_agent_pos
         if action == 2: # Down
             virtual_agent_pos = [self.pos[0] + 1, self.pos[1]]
-            # print("virtual_agent_pos: ", virtual_agent_pos)
             if self.posses_ball:
                 virtual_ball_pos = virtual_agent_pos
         if action == 3: # Left
             virtual_agent_pos = [self.pos[0], self.pos[1] - 1]
-            # print("virtual_agent_pos: ", virtual_agent_pos)
             if self.posses_ball:
                 virtual_ball_pos = virtual_agent_pos
         if action == 4: # Right
             virtual_agent_pos = [self.pos[0], self.pos[1] + 1]
-            # print("virtual_agent_pos: ", virtual_agent_pos)
             if self.posses_ball:
                 virtual_ball_pos = virtual_agent_pos
         if self.team == "attack":
-            agents_around, agents_pos_around = self.see_around(_map)
-            if agents_pos_around:
-                pass_agent_pos = random.choice(agents_pos_around)
-                pass_agent_id = _map[pass_agent_pos[0]][pass_agent_pos[1]]
-                if action == 5 and self.posses_ball: # Pass
-                    # if the ball runs into boundary or defenders it will be stoped and one episode done
+            pass_pos, pass_agent_id = self.can_pass(_map,agents)
+            if action == 5 and self.posses_ball and pass_pos != None: # Pass
+                # if the ball runs into boundary or defenders it will be stoped and one episode done
+                if self.log:
+                    print("agent %d pass ball to agent %d" % (self.id, pass_agent_id))
+                print("pass from ", self.pos, ' to ', pass_pos)
+                virtual_ball_pos = ball.move2(self.pos, pass_pos, agents)
+                if ball.blocked:
                     if self.log:
-                        print("agent %d pass ball to agent %d" % (self.id, pass_agent_id))
-                    virtual_ball_pos = ball.move2(self.pos, pass_agent_pos, agents)
-                    if ball.blocked:
-                        # print("pass block 1")
-                        if self.log:
-                            print("====pass blocked!====")
-                        pass_blocked = True
-                    else:
-                        agents[pass_agent_id].posses_ball = True
+                        print("====pass blocked!====")
+                    pass_blocked = True
+                else:
+                    agents[pass_agent_id].posses_ball = True
+                    self.posses_ball = False
             if action == 6 and self.posses_ball: # Shoot
                 shoot_pos = self.can_shoot()
                 if shoot_pos != None:
-                    # if self.log:
-                    #     print("agent %d shoot" % self.id, " agent pos: ", self.pos)
-                    #     print("shoot pos: ", shoot_pos)
-
-                    # attack_gate_pos = self.gate_pos[1]
-                    # print(attack_gate_pos)
-                    # possible_shoot_pos = []
-                    # for pos in attack_gate_pos:
-                    #     row_start = pos[0] - 2 if pos[0] - 2 >= 0 else 0
-                    #     row_end = pos[0] + 3 if pos[0] + 3 <= self.court_height else self.court_height
-                    #     col_start = pos[1] - 2 if pos[1] - 2 >= 0 else 0
-                    #     col_end = pos[1] + 3 if pos[1] + 3 <= self.court_width else self.court_width
-                    #     for i in range(row_start, row_end):
-                    #         for j in range(col_start, col_end):
-                    #             possible_shoot_pos.append([i, j])
-
-                    # attack_pos = random.choice(attack_gate_pos)
-                    # there is a probability that shoot will miss
-                    # possible_shoot_pos = []
-                    # row_start = attack_pos[0] - 2 if attack_pos[0] - 2 >= 0 else 0
-                    # row_end = attack_pos[0] + 3 if attack_pos[0] + 3 <= self.court_height else self.court_height
-                    # col_start = attack_pos[1] - 2 if attack_pos[1] - 2 >= 0 else 0
-                    # col_end = attack_pos[1] + 3 if attack_pos[1] + 3 <= self.court_width else self.court_width
-                    # for i in range(row_start, row_end):
-                    #     for j in range(col_start, col_end):
-                    #         if i == attack_pos[0] and j == attack_pos[1]:
-                    #             continue
-                    #         possible_shoot_pos.append([i, j])
-                    
-                    # if random.random() > self.miss_prob:
-                    #     shoot_pos = attack_pos
-                    # else:
-                    #     shoot_pos = random.choice(possible_shoot_pos)
-                    # shoot_pos = attack_pos
-                    
                     shoot_success_rate = self.success_rate[shoot_pos[0]]
                     # if random.random() <= shoot_success_rate:
                     virtual_ball_pos = ball.move2(self.pos, shoot_pos, agents)
@@ -284,10 +273,6 @@ class Players:
 
             if action == 5 or action == 6:
                 virtual_agent_pos = self.pos
-            # print("virtual ball pos: ", virtual_ball_pos)
-        # print("virtual agent pos: ", virtual_agent_pos)
-        # print("virtual ball pos: ", virtual_ball_pos)
-        # print()
 
         return virtual_agent_pos, virtual_ball_pos, shoot_blocked, pass_blocked, done
 
@@ -301,20 +286,9 @@ class Players:
             self.block_reward = 0.0
         
         reward_info = dict()
-        # print("simulate in after step: ")
         virtual_agent_pos, virtual_ball_pos, shoot_blocked, pass_blocked, done = self.simulate_move(action, _map, ball, agents)
         if shoot_blocked or pass_blocked:
             block = True
-        # self.log = True
-        # check action = 0, we don't want the agent always stand still
-        # if self.team == 'attack':
-        #     self.actions.append(action)
-        #     # print("self.actions: ", self.actions)
-        # if len(self.actions) and self.actions.count(0) / len(self.actions) >= 0.5:
-        #     stand_still_penalty = -50.0
-        #     print("++++++++++++++++++++++++get penalty+++++++++++++++++++++++++++")
-        # if len(self.actions) > 1000:
-        #     self.actions.clear() # avoid memory leak
         
         shoot_pos = self.can_shoot()
 

@@ -48,13 +48,10 @@ def train(net, train_loader, criterion, optimizer, device, model_id):
         running_loss = 0.0
         for i, (inputs, labels) in enumerate(train_loader):
             inputs, labels = inputs.to(device), labels.to(device)
-            # print(inputs.size())
             labels = labels.reshape(1, -1).squeeze()
             labels = labels.long()
             optimizer.zero_grad()
             outputs = net(inputs)
-            # print("outputs: ", outputs)
-            # print("labels: ", labels)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -73,8 +70,6 @@ def train(net, train_loader, criterion, optimizer, device, model_id):
 
 def test(net, test_loader, device, path, model_id, distance_threshold):
     print("start testing")
-    # net.eval()
-    # net.load_state_dict(torch.load(path))
     net = torch.load(path)
     net.eval()    
     total, correct = 0, 0
@@ -169,5 +164,5 @@ def main(to_train=True, to_test=False, test_trained_models=False, history_num=HI
             accuracy = test(net, test_loader, device, path, model_id, TEST_THRESHOLD)
     
 
-# if __name__ == "__main__":
-#     main(to_train=True, to_test=True, test_trained_models=True)
+if __name__ == "__main__":
+    main(to_train=True, to_test=True, test_trained_models=True)

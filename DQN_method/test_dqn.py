@@ -12,21 +12,23 @@ import numpy as np
 from utils import *
 from agents import Agents
 
-ATTACK_PATH = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_attack5/football_0.710_59.780.dat'
+ATTACK_PATH1 = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_attack5/football_0.710_59.780.dat'
+ATTACK_PATH2 = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_attack5/football_0.890_72.300.dat'
 # ATT.ACK_PATH = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_attack6/football_93.650_0.890.dat'
-DEFEND_PATH = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_defend4/football_0.860_98.000.dat'
+DEFEND_PATH1 = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_defend4/football_0.860_98.000.dat'
+DEFEND_PATH2 = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_defend4/football_0.830_100.000.dat'
 # DEFEND_PATH = '/home/chenkehan/RESEARCH/codes/experiment4/DQN_method/res_defend4/football_0.700_100.000.dat'
 
 def test():
-    env = Football_Env(agents_left=[1], agents_right=[2],
+    env = Football_Env(agents_left=[1, 2], agents_right=[3, 4],
     max_episode_steps=500, move_reward_weight=1.0,
     court_width=23, court_height=20, gate_width=6)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     agents = Agents(env, 'attack', device=device,
-         use_trained_attack_net=False, use_trained_defend_net=True,
-        defender_net_path=DEFEND_PATH, attacker_net_path=ATTACK_PATH)
+         use_trained_attack_net=True, use_trained_defend_net=True,
+        defender_net_path=[DEFEND_PATH1, DEFEND_PATH2], attacker_net_path=[ATTACK_PATH1, ATTACK_PATH2])
     
     trained_defend_net, trained_attack_net = agents.get_nets()
 
@@ -41,9 +43,6 @@ def test():
         all_state = env.reset()
         while True:
             actions, _, _, _, _, _, _ = agents.get_actions(all_state, trained_defend_net, trained_attack_net)
-            print("actions: ", actions[1])
-            if actions[1] == 3:
-                time.sleep(2)
             next_state, rewards, done, info = env.step(actions)
             total_steps += 1
 
@@ -52,7 +51,7 @@ def test():
                     total_reward += rew.reward
             
             if done:
-                print("game done winner: ", info['winner'])
+                print("game done winner: ", info['winner'], "\n")
                 if info['winner'] == agents.train_team:
                     total_win_times += 1
                 if info['winner'] == 'tie':

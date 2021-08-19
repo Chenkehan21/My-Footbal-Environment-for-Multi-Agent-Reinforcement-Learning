@@ -50,15 +50,15 @@ class Ball:
         return pos
 
     def move2(self, source, destination, agents):
-        # print("source: ", source)
-        # print("destination: ", destination)
         self.blocked = False
         if destination[1] != source[1]:
             k = (destination[0] - source[0]) / (destination[1] - source[1])
-        else:
-            k = 0
-        b = source[0] - k * source[1]
-        f = lambda x: k * x + b
+            b = source[0] - k * source[1]
+            f = lambda x: k * x + b
+        elif destination[1] == source[1]:
+            f = lambda x: source[1]
+        elif destination[0] == source[0]:
+            f = lambda x: source[0]
         
         for agent in agents.values():
             if agent.team == 'defend':
@@ -66,7 +66,7 @@ class Ball:
                 defend_y_min = agent.pos[0] - 1
                 defend_y_max = agent.pos[0] + 1
                 y = f(defend_x)
-                if y >= defend_y_min and y <= defend_y_max:
+                if y >= defend_y_min and y <= defend_y_max and defend_x >= source[1] and defend_x <= destination[1]:
                     self.blocked = True
                     pos = [int(y), defend_x]
         if not self.blocked:
@@ -83,9 +83,6 @@ class Ball:
 
     def check_ball_score(self, team, court_id, court_width, court_height, gate_width=6):
         gate_range = [int(court_height / 2) - int(gate_width / 2), int(court_height / 2) + int(gate_width / 2) + 1]
-        # print("gate range: ", gate_range)
-        # print("court id: ", court_id)
-        # print("ball pos: ", self.pos)
         if team == "attack" and court_id == "left":
             if self.pos[1] == court_width - 1 and (self.pos[0] <= gate_range[1] and self.pos[0] >= gate_range[0]):
                 return True

@@ -20,50 +20,71 @@ class Panel_Control(Agents):
                 )
 
         self.window = window
-        # print("path: ", self.defender_net_path)
         self.trained_defend_net, self.trained_attack_net = self.get_nets()
+        self.state = self.env.reset()
         self.actionResponse()
 
     def doReset(self):
-        print("Reset Button")
-        self.env.reset()
+        print("\nReset Button")
+        self.state = self.env.reset()
         self.window.doRefresh(self.env)
     
-    # def doStep(self):
-    #     print("do step")
-    #     while not self.env.Done:
-    #         total_actions = self.env.sample_actions()
-    #         actions = []
-    #         for action in total_actions:
-    #             actions.append(action.action)
-    #         print("actions: ", actions)
-    #         next_state, rewards, done, info = self.env.step(actions)
-    #         self.window.doRefresh_Step(self.env)
-    #         if done:
-    #             print("game done winner: ", info['winner'])
-    #             break
+    def doRandomStep(self):
+        if not self.env.Done:
+            total_actions = self.env.sample_actions()
+            actions = []
+            for action in total_actions:
+                actions.append(action.action)
+            next_state, rewards, done, info = self.env.step(actions)
+            self.window.doRefresh_Step(self.env)
+            if done:
+                self.window.doRefresh_Step(self.env)
+                print("game done winner: ", info['winner'], "\n")
+    
+    def doRandomAuto(self):
+        while not self.env.Done:
+            total_actions = self.env.sample_actions()
+            actions = []
+            for action in total_actions:
+                actions.append(action.action)
+            next_state, rewards, done, info = self.env.step(actions)
+            self.window.doRefresh_Step(self.env)
+            if done:
+                self.window.doRefresh_Step(self.env)
+                print("game done winner: ", info['winner'], "\n")
+                break
 
-    def doStep(self):
-        print("do step, trained team: ", self.train_team)
+    def doAIStep(self):
+        if not self.env.Done:
+            actions, _, _, _, _, _, _ = self.get_actions(self.state, self.trained_defend_net, self.trained_attack_net)
+            next_state, rewards, done, info = self.env.step(actions)
+
+            if done:
+                print("game done winner: ", info['winner'], "\n")
+                self.window.doRefresh_Step(self.env)
+
+            self.state = next_state
+            self.window.doRefresh_Step(self.env)
+    
+    def doAIAuto(self):
         all_state = self.env.reset()
 
         while not self.env.Done:
             actions, _, _, _, _, _, _ = self.get_actions(all_state, self.trained_defend_net, self.trained_attack_net)
-            # print("actions: ", actions)
             next_state, rewards, done, info = self.env.step(actions)
 
             if done:
-                print("game done winner: ", info['winner'])
+                print("game done winner: ", info['winner'], "\n")
                 self.window.doRefresh_Step(self.env)
                 break
 
             all_state = next_state
             self.window.doRefresh_Step(self.env)
 
-    def doAuto(self):
-        pass
-
     def actionResponse(self):
         self.window.Button_Reset.clicked.connect(self.doReset)
-        self.window.Button_Step.clicked.connect(self.doStep)
-        # self.window.Button_Auto.clicked.connect(self.doAuto)
+        self.window.Button_Random_Step.clicked.connect(self.doRandomStep)
+        self.window.Button_Random_Auto.clicked.connect(self.doRandomAuto)
+        if self.use_trained_defend_net or self.use_trained_attack_net:
+            self.window.Button_AI_Step.clicked.connect(self.doAIStep)
+            self.window.Button_AI_Auto.clicked.connect(self.doAIAuto)

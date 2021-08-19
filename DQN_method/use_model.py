@@ -76,5 +76,5 @@ def test():
                     f.write(action)
 
 if __name__ == "__main__":
-    # use_model()
+    use_model()
     test()

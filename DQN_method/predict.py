@@ -77,7 +77,7 @@ def predict():
                     total_reward += rew.reward
             
             if done:
-                print("game done winner: ", info['winner'])
+                print("game done winner: ", info['winner'], "\n")
                 if info['winner'] == agents.train_team:
                         total_win_times += 1
                 break

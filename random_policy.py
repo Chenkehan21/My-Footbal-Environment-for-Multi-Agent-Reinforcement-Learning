@@ -22,17 +22,12 @@ while True:
                 actions.append(action.action)
             obs, rewards, done, info = env.step(actions)
             total_steps += 1
-            # print("total steps: ", total_steps)
             for reward in rewards:
                 if reward.team == "attack":
                     attack_total_reward += reward.reward
                 if reward.team == "defend":
                     defend_total_reward += reward.reward
             if done:
-                # print("****done****")
-                # print("attack total reward: ", attack_total_reward)
-                # print("defend total reward: ", defend_total_reward)
-                # print()
                 if info['winner'] == 'attack':
                     attack_total_win += 1
                 if info['winner'] == 'defend':
@@ -49,5 +44,3 @@ while True:
     print("defend win rate: ", defend_win_rate)
     n += 1
     time.sleep(3)
-    # if mean_defend_reward > 26:
-    #     break

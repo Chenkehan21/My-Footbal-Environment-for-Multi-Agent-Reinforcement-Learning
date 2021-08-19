@@ -73,6 +73,7 @@ class Football_Env:
         self.defend_action_space_n = 5
         self.blocked = False
         self.winner = []
+        self.lose_attack_agent_id = 10000
 
     def reset(self):
         self.blocked = False
@@ -99,10 +100,6 @@ class Football_Env:
         
         # update map 
         self.update_map()
-
-        # for i in range(1, self.n_agents + 1):
-        #     print("agent %d pos1: " % i, self.agents[i].pos, "|action: ", end='|')
-        #     print("agent %d pos2: " % i, self.agents[i].pos, "|ball_pos", self.ball.pos, "|posses ball: ", self.agents[i].posses_ball)
 
         return self.get_obs()
 
@@ -212,14 +209,16 @@ class Football_Env:
             if self._map[agent.pos[0]][agent.pos[1]] == 0:
                 self._map[agent.pos[0]][agent.pos[1]] = agent.id
             else:
-                print("^^^^^^^^^^agents contact!^^^^^^^^^^")
-                self.agents_conflict = True
-                self.winner.append('defend')
-                self.tackle_reward = 5.0
-                # agent_id = self._map[agent.pos[0]][agent.pos[1]]
-                # if self.agents[agent_id].team != agent.team and (self.agents[agent_id].posses_ball or agent.posses_ball):
-                #     self.tackle_reward = 5.0
-                #     self.tackle_winner = 'defend'
+                agent_id = int(self._map[agent.pos[0]][agent.pos[1]])
+                if self.agents[agent_id].team != agent.team and (self.agents[agent_id].posses_ball or agent.posses_ball):
+                    self.agents_conflict = True
+                    print("^^^^^^^^^^agents contact!^^^^^^^^^^")
+                    self.winner.append('defend')
+                    self.tackle_reward = 5.0
+                    if self.agents[agent_id].team == 'attack':
+                        self.lose_attack_agent_id = agent_id
+                    else:
+                        self.lose_attack_agent_id = agent.id
 
     def get_obs(self):
         obs = []
@@ -232,7 +231,7 @@ class Football_Env:
     def sample_actions(self):
         actions = []
         for i in range(1, self.n_agents + 1):
-            _actions = self.Actions(self.agents[i].team, self.agents[i].id, self.agents[i].sample_action())
+            _actions = self.Actions(self.agents[i].team, self.agents[i].id, self.agents[i].sample_action(self._map, self.agents))
             actions.append(_actions)
         
         return tuple(actions)
@@ -252,19 +251,15 @@ class Football_Env:
         done_rewards, move_rewards, goal_rewards = [], [], []
         dones = []
         infos = {"attack_team": [], "defend_team": [], "ball_pos": None, "winner": None}
-        # print("self.n_agents: ", self.n_agents)
+
         for i in range(1, self.n_agents + 1):
             agent_info = {"id": None, "posses_ball": None, "reward_details": None, "move_details": None}
             agent_info["id"] = i
             agent_info["posses_ball"] = self.agents[i].posses_ball
 
             move_details = {"action": None, "last_position": None, "current_position": None}
-            # print("actions: ", actions)
             move_details["action"] = actions[i - 1]
             move_details["last_position"] = self.agents[i].pos
-
-            # if self.agents[i].team == 'defend':
-            #     print("agent pos: ", self.agents[i].pos, " action: ", actions[i - 1])
 
             move_reward, rew_info, move_dones = self.get_move_rewards(self.agents[i], actions[i - 1])
             self.update_map()
@@ -283,10 +278,8 @@ class Football_Env:
             goal_rewards.append(goal_reward)
             if goal_reward != 0:
                 dones.append(True)
-            # print("agent %d pos1: " % i, self.agents[i].pos, "|action: ", actions[i - 1], end='|')
             agent_done, done_reward = self.get_done_rewards(self.agents[i], actions[i - 1])
             move_details["current_position"] = self.agents[i].pos
-            # print("agent %d pos2: " % i, self.agents[i].pos, "|ball_pos", self.ball.pos, "|posses ball: ", self.agents[i].posses_ball)
             dones += agent_done
             done_rewards.append(done_reward)
 
@@ -301,41 +294,30 @@ class Football_Env:
             if self.agents[i].team == "defend":
                 infos["defend_team"].append(agent_info)
             infos["ball_pos"] = self.ball.pos
+            
 
         self.elapsed_steps += 1
-        # print("elapsed steps: ", self.elapsed_steps)
         if self.elapsed_steps >= self.max_episode_steps:
             print("max episode steps elapsed!")
             dones.append(True)
 
         rewards = []
-
-        # if self.GOAL_REWARD in goal_rewards or self.score_defend_penalty in goal_rewards and self.score_defend_penalty != 0:
-        #     print("goal rewards: ", goal_rewards)
-        #     time.sleep(1)
-
         for i in range(self.n_agents):
             rew = float(goal_rewards[i] + done_rewards[i] + self.move_reward_weight * move_rewards[i])
             reward = self.Rewards(team=self.agents[i + 1].team, agent_id=i + 1, reward=rew)
             rewards.append(reward)
         rewards = tuple(rewards)
-        # print(dones)
+
         done = True in dones
         self.Done = done
-        # if not done:
-            # print("***update map***")
-            # self.winner.append(self.tackle_winner)
         if done:
-            print("\nself.winner: ", self.winner)
+            infos['lose_id'] = self.lose_attack_agent_id
             if self.winner:
                 infos['winner'] = self.winner[0]
             if len(self.winner) == 0 and self.elapsed_steps >= self.max_episode_steps:
                 infos['winner'] = 'tie'
-            for i in range(1, self.n_agents + 1):
-                print("agent_%d pos: " % self.agents[i].id, self.agents[i].pos, "agent team: ", self.agents[i].team)
 
         obs = self.get_obs()
-        # print("winner list: ", self.winner)
 
         return obs, rewards, done, infos
 
@@ -349,7 +331,6 @@ class Football_Env:
                 self.score_defend_penalty = -self.GOAL_REWARD
                 return self.GOAL_REWARD
             else:
-                # print("shoot not score.")
                 self.winner.append("defend")
                 return 0.0
         elif agent.team == 'defend' and self.score_defend_penalty != 0:
@@ -369,21 +350,6 @@ class Football_Env:
                 self.winner.append("defend")
             if agent.team == "defend":
                 self.winner.append("attack")
-        
-        # if self.ball.check_ball_pass_court(self._map):
-        #     print("ball past court!")
-        #     dones.append(True)
-        #     done_reward -= 1.0
-        #     if agent.team == "attack":
-        #         self.winner.append("defend")
-        #     if agent.team == "defend":
-        #         self.winner.append("attack")
-
-        # if self.ball.check_ball_score(agent.team, agent.court_id, self.court_width, self.court_height):
-        #     print("hahahahahaha")
-        #     dones.append(True)
-        #     done_reward += 1.0
-            
 
         return dones, done_reward
 
@@ -393,15 +359,14 @@ class Football_Env:
         self.agents[agent.id].pos = virtual_agent_pos
         self.ball.pos = virtual_ball_pos
         dones.append(done)
-        # if winner != None:
-        #     self.winner.append(winner)
-        
+
         if block:
             self.blocked = True
             print("**********block**********")
             self.defender_block_reward = 100.0
             dones.append(True)
             self.winner.append('defend')
+            self.lose_attack_agent_id = agent.id
         rew_info['block'] = self.defender_block_reward
 
         return move_reward, rew_info, dones

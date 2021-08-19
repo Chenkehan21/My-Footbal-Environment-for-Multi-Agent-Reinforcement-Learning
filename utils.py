@@ -7,7 +7,7 @@ def handle_obs(all_obs, train_team):
         if obs_info.team == train_team:
             res.append(obs)
     # if len(res) > 1:
-    res = np.concatenate(res)
+    # res = np.concatenate(res)
     
     return res
 

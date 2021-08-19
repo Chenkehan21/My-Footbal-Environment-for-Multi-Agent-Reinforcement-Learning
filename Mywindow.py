@@ -121,8 +121,7 @@ if __name__ == '__main__': #如果整个程序是主程序
     max_episode_steps=500, move_reward_weight=1.0,
     court_width=23, court_height=20, gate_width=6)
     env.reset()
-    print("attack court: ", env.attack_court)
-    print("ball pos: ", env.ball.pos)
+
     window = mywindow(1, env)
     #有了实例，就得让它显示，show()是QWidget的方法，用于显示窗口。
     window.show()
