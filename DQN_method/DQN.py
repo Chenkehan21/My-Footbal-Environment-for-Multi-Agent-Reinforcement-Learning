@@ -35,8 +35,8 @@ EPSILON_DECAY_LAST_FRAMES = 40000 # during the first 150,000 frames, epsilon is 
 EPSILON_START = 1.0
 EPSILON_END = 0.01
 
-SAVE_PATH_ATTACK = './DQN_method/res_attack6'
-SAVE_PATH_DEFEND = './DQN_method/res_defend4'
+SAVE_PATH_ATTACK = './DQN_method/res_attack'
+SAVE_PATH_DEFEND = './DQN_method/res_defend'
 
 
 Experience = collections.namedtuple("Experience", field_names=["state", "action", "reward", "done", "next_state"])
@@ -71,55 +71,63 @@ class Agent:
             self.AI_team = 'defend'
         else:
             self.AI_team = 'attack'
+        for agent in self.env.agents.values():
+            if agent.team == self.AI_team:
+                self.AI_id = agent.id
+            else:
+                self.trainer_id = agent.id
         self._reset()
 
     def _reset(self):
         state = self.env.reset()
         self.state = handle_obs(state, self.train_team)
         if self.train_team == 'attack':
-            self.AI_state = handle_obs(state, 'defend')
+            self.AI_state = handle_obs(state, 'defend')[0]
         if self.train_team == 'defend':
-            self.AI_state = handle_obs(state, 'attack')
+            self.AI_state = handle_obs(state, 'attack')[0]
         self.total_rewards = 0.0
 
-    def check_action(self, action, team):
-        for agent in self.env.agents.values():
-            if team == "attack" and agent.team == team:
-                actions = list(range(7))
+    def check_action(self, id, action):
+        if self.env.agents[id].team == 'attack':
+            actions = list(range(7))
+            if self.env.agents[id].pos[0] == 0:
+                actions.remove(1)
+            if self.env.agents[id].pos[0] == self.env.court_height - 1:
+                actions.remove(2)
+            if self.env.agents[id].pos[1] == 0:
+                actions.remove(3)
+            if self.env.agents[id].pos[1] == self.env.court_width - 1:
+                actions.remove(4)
+
+            pass_pos, pass_agent_id = self.env.agents[id].can_pass(self.env._map, self.env.agents)
+            if pass_pos == None:
                 actions.remove(5)
-                if agent.pos[0] == 0:
-                    actions.remove(1)
-                if agent.pos[0] == self.env.court_height - 1:
-                    actions.remove(2)
-                if agent.pos[1] == 0:
-                    actions.remove(3)
-                if agent.pos[1] == self.env.court_width - 1:
-                    actions.remove(4)
+            else:
+                if self.env.agents[id].posses_ball == False:
+                    actions.remove(5)
 
-                # shoot_pos = agent.can_shoot()
-                # if shoot_pos:
-                #     shoot_success_rate = agent.success_rate[shoot_pos[0]]
-                #     if (agent.posses_ball and shoot_pos and random.random() < shoot_success_rate) != True:
-                #         actions.remove(6)
-                # else:
-                #     actions.remove(6)
-                
-                if action in actions:
-                    return True
+            # shoot_pos = self.env.agents[id].can_shoot()
+            # if shoot_pos:
+            #     shoot_success_rate = self.env.agents[id].success_rate[shoot_pos[0]]
+            #     if (self.env.agents[id].posses_ball and shoot_pos and random.random() < shoot_success_rate) != True:
+            #         actions.remove(6)
+            # else:
+            #     actions.remove(6)
 
-            if team == "defend" and agent.team == team:
-                actions = list(range(5))
-                if agent.pos[0] == 0:
-                    actions.remove(1)
-                if agent.pos[0] == self.env.court_height - 1:
-                    actions.remove(2)
-                if agent.pos[1] == 0:
-                    actions.remove(3)
-                if agent.pos[1] == self.env.court_width - 1:
-                    actions.remove(4)
-                
-                if action in actions:
-                    return True
+        if self.env.agents[id].team == 'defend':
+            actions = list(range(5))
+            if self.env.agents[id].pos[0] == 0:
+                actions.remove(1)
+            if self.env.agents[id].pos[0] == self.env.court_height - 1:
+                actions.remove(2)
+            if self.env.agents[id].pos[1] == 0:
+                actions.remove(3)
+            if self.env.agents[id].pos[1] == self.env.court_width - 1:
+                actions.remove(4) 
+        if action in actions:
+            # print("action: ", action)
+            return True
+
         return False
 
     @torch.no_grad()
@@ -135,7 +143,7 @@ class Agent:
                     trainer_action = action.action
                 actions.append(action.action)
         else:
-            state_a = np.array(self.state, copy=False) # add an dimension for BATCH_SIZE!
+            state_a = np.array(self.state[0], copy=False) # add an dimension for BATCH_SIZE!
             state_v = torch.tensor(state_a, dtype=torch.float).to(device)
             AI_state_a = np.array(self.AI_state, copy=False)
             AI_state_v = torch.tensor(AI_state_a, dtype=torch.float).to(device)
@@ -144,7 +152,8 @@ class Agent:
             if len(q_values) > 0:
                 sorted_q_values, index = q_values.sort(descending=True)
                 trainer_actions = index.tolist()
-                while self.check_action(trainer_actions[0], self.train_team) == False:
+                # print(trainer_actions)
+                while self.check_action(self.trainer_id, trainer_actions[0]) == False:
                     trainer_actions.pop(0)
                 trainer_action = trainer_actions[0]
 
@@ -158,7 +167,7 @@ class Agent:
             if len(AI_q_values) > 0:
                 sorted_q_values, index = AI_q_values.sort(descending=True)
                 AI_actions = index.tolist()
-                while self.check_action(AI_actions[0], self.AI_team) == False:
+                while self.check_action(self.AI_id, AI_actions[0]) == False:
                     AI_actions.pop(0)
                 AI_action = AI_actions[0]
             total_actions = self.env.sample_actions()
@@ -194,7 +203,6 @@ class Agent:
 
         return done_reward, win_times
 
-
 def calc_loss(loss_function, batch, net, target_net, device="cpu"):
     states, actions, rewards, dones, next_states = batch
     states_v = torch.tensor(np.array(states, copy=False), dtype=torch.float).to(device) # copy=False means if states changes states_v will change too
@@ -203,10 +211,11 @@ def calc_loss(loss_function, batch, net, target_net, device="cpu"):
     done_mask = torch.BoolTensor(dones).to(device)
     next_states_v = torch.tensor(np.array(next_states, copy=False), dtype=torch.float).to(device)
 
-    q_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
+    # q_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
+    q_values = net(states_v).squeeze().gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
 
     with torch.no_grad():
-        max_next_q_values = target_net(next_states_v).max(1)[0] # maxmize along axis 1, return values and index. we need values only
+        max_next_q_values = target_net(next_states_v).squeeze().max(1)[0] # maxmize along axis 1, return values and index. we need values only
         
         max_next_q_values[done_mask] = 0.0
 
@@ -245,6 +254,7 @@ def train(net, target_net, buffer, agent, optimizer, loss_function,
             print("total steps: %d| %d games done| mean_reward100: %.3f| win_rate: %.3f| eps: %.3f| speed: %.3f f/s" %\
                 (frame_idx, len(total_rewards), mean_reward, win_rate, epsilon, speed))
             # time.sleep(2)
+            print(total_rewards)
 
             if len(total_rewards) > 100:
                 writer.add_scalar("dqn_"+DEFAULT_ENV_NAME+"_mean_reward", mean_reward, len(total_rewards))
@@ -293,8 +303,9 @@ def main(save_path, train_team, use_trained_defend_net=False, use_trained_attack
     os.makedirs(save_path, exist_ok=True)
 
     env = Football_Env(agents_left=[1], agents_right=[2],
-    max_episode_steps=5000, move_reward_weight=1.0,
+    max_episode_steps=500, move_reward_weight=1.0,
     court_width=23, court_height=20, gate_width=6)
+    env.reset()
 
     buffer = ExperienceBuffer(REPLAY_SIZE)
     agent = Agent(env, buffer, train_team)
@@ -304,7 +315,10 @@ def main(save_path, train_team, use_trained_defend_net=False, use_trained_attack
     if agent.train_team == "defend":
         action_space = agent.env.defend_action_space_n
 
-    input_shape = len(agent.state)
+    input_shape = len(agent.state[0])
+    # print(input_shape)
+    # print(agent.state)
+    # exit()
     output_shape = action_space 
     net = DQN(input_shape, output_shape).to(device)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE) # only need one optimizer
@@ -341,4 +355,4 @@ def main(save_path, train_team, use_trained_defend_net=False, use_trained_attack
 
 if __name__ == "__main__":
     main(save_path=SAVE_PATH_ATTACK, train_team='attack',
-         use_trained_attack_net=False, use_trained_defend_net=True)
+         use_trained_attack_net=False, use_trained_defend_net=False)

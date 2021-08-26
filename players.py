@@ -74,13 +74,13 @@ class Players:
                 if self.posses_ball == False:
                     actions.remove(5)
 
-            shoot_pos = self.can_shoot()
-            if shoot_pos:
-                shoot_success_rate = self.success_rate[shoot_pos[0]]
-                if (self.posses_ball and random.random() < shoot_success_rate) != True:
-                    actions.remove(6)
-            else:
-                actions.remove(6)
+            # shoot_pos = self.can_shoot()
+            # if shoot_pos:
+            #     shoot_success_rate = self.success_rate[shoot_pos[0]]
+            #     if (self.posses_ball and random.random() < shoot_success_rate) != True:
+            #         actions.remove(6)
+            # else:
+            #     actions.remove(6)
             
             action = random.choice(actions)
 
@@ -303,12 +303,12 @@ class Players:
                 attack_reward += -2.0
 
             if action in [0, 1, 2, 3, 4, 5]:
-                attack_reward -= 1.0
+                attack_reward -= 2.0
 
             if shoot_pos != None and action != 6:
-                attack_reward -= 5.0
-            # if action == 6:
-            #     attack_reward += 1.0
+                attack_reward -= 2.0
+            if action == 6 and shoot_pos == None:
+                attack_reward -= 2.0
 
         if self.team == "defend":
             if self.pos[0] - ball.pos[0] < 0 and action == 2:

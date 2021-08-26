@@ -2,7 +2,7 @@ from football_env import Football_Env
 import time
 
 env = Football_Env(agents_left=[1], agents_right=[2],
-    max_episode_steps=50000, move_reward_weight=1.0,
+    max_episode_steps=500, move_reward_weight=1.0,
     court_width=23, court_height=20, gate_width=6)
 
 n = 1

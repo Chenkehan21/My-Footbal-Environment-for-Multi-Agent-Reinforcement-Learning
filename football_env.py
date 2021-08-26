@@ -57,7 +57,7 @@ class Football_Env:
         self.gate_width = gate_width
         self.move_reward_weight = move_reward_weight
         self.elapsed_steps = 0
-        self.GOAL_REWARD = 100.0
+        self.GOAL_REWARD = 5000.0
         self.tackle_reward = 0.0
         self.score_defend_penalty = 0.0
         self.defender_block_reward = 0.0
